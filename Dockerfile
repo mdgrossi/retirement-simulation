@@ -6,4 +6,5 @@ COPY requirements.txt .
 
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
-    pip install --upgrade pip ipython ipykernel
+    pip install --upgrade pip ipython ipykernel && \
+    ipython kernel install --name "python3" --user
