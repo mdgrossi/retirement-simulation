@@ -23,7 +23,7 @@ from shinywidgets import render_widget
 from bokeh.io import output_notebook
 output_notebook(hide_banner=True)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import investpy as ip
 ```
 
