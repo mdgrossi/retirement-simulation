@@ -25,7 +25,7 @@ jobs:
       - name: Upgrade pip and install packages
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-orig.txt
+          pip install -r requirements.txt
 
       - name: Install shinylive python package
         run: python -m pip install shinylive
