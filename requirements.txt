@@ -7,3 +7,4 @@ scipy
 shinywidgets
 jupyter_bokeh
 nbformat
+nbclient
