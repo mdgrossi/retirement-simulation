@@ -8,3 +8,4 @@ shinywidgets
 jupyter_bokeh
 nbformat
 nbclient
+ipykernel==6.26.0
