@@ -13,7 +13,7 @@ server: shiny
 #| context: setup
 import numpy as np
 import pandas as pd
-import investpy as ip
+# import investpy as ip
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from shiny import render, reactive, ui
@@ -23,7 +23,7 @@ from bokeh.io import output_notebook
 output_notebook(hide_banner=True)
 ```
 
-```{python}
+```{python include="investpy.py"}
 #| title: Parameters
 #| expandable: false
 
@@ -53,7 +53,7 @@ ui.input_numeric("retire_age", "Age at retiremenet", value=62)
 def growth():
     # print(1986 + input.retire_age() - pd.to_datetime('today').year)
     growth_years = int(1986 + input.retire_age() - pd.to_datetime('today').year)
-    growth_df = ip.growth_simulation(
+    growth_df = investpy.growth_simulation(
         start_capital=input.initial_investment(),
         return_mean=input.growth_return_mean(),
         # return_stdev=8,
@@ -66,7 +66,7 @@ def growth():
         n_years=growth_years,
         n_simulations=100)
     
-    return ip.growth_plot(growth_df)
+    return investpy.growth_plot(growth_df)
 ``` 
 
 # Retirement
@@ -101,7 +101,7 @@ ui.input_numeric("scenario_percent", "Target perecent of scenarios paying out", 
 ```{python}
 @render.plot()
 def nav_1():
-    nav_df = ip.withdrawal_simulation(
+    nav_df = investpy.withdrawal_simulation(
         start_capital=input.start_capital(),
         return_mean=input.retirement_return_mean(),
         return_stdev=0.07,
@@ -111,7 +111,7 @@ def nav_1():
         n_years=40,
         n_simulations=100)
 
-    return ip.withdrawal_plot(
+    return investpy.withdrawal_plot(
         nav_df,
         scenario_percent=input.scenario_percent(), 
         retire_age=input.retire_age())
