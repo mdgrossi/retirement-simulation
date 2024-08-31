@@ -2,4 +2,7 @@ matplotlib==3.8.1
 numpy==1.26.1
 pandas==2.1.2
 shiny==0.6.0
-bokeh
+bokeh==3.5.1
+scipy
+shinywidgets
+jupyter_bokeh
