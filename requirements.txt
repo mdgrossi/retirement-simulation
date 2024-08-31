@@ -7,5 +7,5 @@ nbformat==5.9.2
 nbclient==0.8.0
 ipykernel==6.26.0
 scipy
-shiny_widgets
+shinywidgets
 jupyter_bokeh
