@@ -5,6 +5,10 @@ logo: retirement-logo.png
 server: shiny
 ---
 
+# Saving
+
+## {.sidebar}
+
 ```{python}
 #| context: setup
 import numpy as np
@@ -13,40 +17,39 @@ import investpy as ip
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from shiny import render, reactive, ui
+from bokeh.plotting import figure, show, output_file
+from shinywidgets import render_widget
+from bokeh.io import output_notebook
+output_notebook(hide_banner=True)
 ```
-
-## {.sidebar}
 
 ```{python}
 #| title: Parameters
 #| expandable: false
 
+ui.input_numeric("starting_salary", "Starting salary", value=100000)
+
 ui.input_numeric("initial_investment", "Initial investment", value=200000)
 
-ui.input_slider("growth_return_mean", "Average annual investment return while saving", 0, 12, value=4.0, step=0.5, post="%")
+# ui.input_slider("growth_return_mean", "Average annual investment return while saving", 0, 12, value=4.0, step=0.5, post="%")
+ui.input_numeric("growth_return_mean", "Mean annual savings return (%)", value=4.0)
 
-ui.input_slider("monthly_contribution", "Monthly contributions to retirement savings", 0, 10000, value=2000, step=100, pre="$")
+# ui.input_slider("monthly_contribution", "Monthly contributions to retirement savings", 0, 10000, value=2000, step=100, pre="$")
+ui.input_numeric("monthly_contribution", "Monthly contributions", value=2000)
 
-ui.input_slider("raise_mean", "Average annual salary raise percentage", 0, 5, value=1.01, step=0.01, post="%")
+# ui.input_slider("raise_mean", "Average annual salary raise percentage", 0, 5, value=1.01, step=0.01, post="%")
+ui.input_numeric("raise_mean", "Mean annual salary raise (%)", value=1.01)
 
-ui.input_slider("retire_age", "Age at retiremenet", 55, 75, value=62, step=1)
-
-ui.input_slider("start_capital", "Starting retirement balance", 1e4, 1e7, value=1e6, pre="$")
-
-ui.input_slider("retirement_return_mean", "Average annual investment return in retirement (Bond market averages 2.5%)", 0, 12, value=2.5, step=0.5, post="%")
-
-ui.input_slider("inflation_mean", "Average annual inflation", 0, 20, value=2.5, step=0.5, post="%")
-
-ui.input_slider("monthly_withdrawal", "Monthly withdrawals", 0, 20000, value=2000, step=100, pre="$")
-
-ui.input_slider("scenario_percent", "Target perecent of scenarios paying out", 50, 100, value=90, step=5, post="%")
+# ui.input_slider("retire_age", "Age at retiremenet", 55, 75, value=62, step=1)
+ui.input_numeric("retire_age", "Age at retiremenet", value=62)
 ```
 
 
 ## Column
 
+
 ```{python}
-@render.plot()
+@render_widget
 def growth():
     # print(1986 + input.retire_age() - pd.to_datetime('today').year)
     growth_years = int(1986 + input.retire_age() - pd.to_datetime('today').year)
@@ -66,6 +69,34 @@ def growth():
     return ip.growth_plot(growth_df)
 ``` 
 
+# Retirement
+
+## {.sidebar}
+
+```{python}
+#| title: Parameters
+#| expandable: false
+
+# ui.input_slider("retire_age", "Age at retiremenet", 55, 75, value=62, step=1)
+ui.input_numeric("retire_age", "Age at retiremenet", value=62)
+
+# ui.input_slider("start_capital", "Starting retirement balance", 1e4, 1e7, value=1e6, pre="$")
+ui.input_numeric("start_capital", "Starting retirement balance", value=1e6)
+
+# ui.input_slider("retirement_return_mean", "Average annual investment return in retirement (Bond market averages 2.5%)", 0, 12, value=2.5, step=0.5, post="%")
+ui.input_numeric("retirement_return_mean", "Average annual investment return in retirement (Bond market averages 2.5%)", value=2.5)
+
+# ui.input_slider("inflation_mean", "Average annual inflation", 0, 20, value=2.5, step=0.5, post="%")
+ui.input_numeric("inflation_mean", "Average annual inflation (%)", value=2.5)
+
+# ui.input_slider("monthly_withdrawal", "Monthly withdrawals", 0, 20000, value=2000, step=100, pre="$")
+ui.input_numeric("monthly_withdrawal", "Monthly withdrawals", value=2000)
+
+# ui.input_slider("scenario_percent", "Target perecent of scenarios paying out", 50, 100, value=90, step=5, post="%")
+ui.input_numeric("scenario_percent", "Target perecent of scenarios paying out", value=90)
+```
+
+## Column
 
 ```{python}
 @render.plot()

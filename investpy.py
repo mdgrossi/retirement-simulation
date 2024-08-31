@@ -3,6 +3,11 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
+import bokeh.models as bm
+from bokeh.models import CustomJSTickFormatter, NumeralTickFormatter
+from bokeh.plotting import figure, show, output_file
+# from bokeh.io import output_notebook
+# output_notebook(hide_banner=True)
 
 def sims_matrix(rows, cols, mean, stdev):
     """Create a matrix of simulation adding noise (random numbers) about the mean and standard devation 'stdev'. Rows contain time and columns contain different simulations.
@@ -90,31 +95,51 @@ def growth_simulation(start_capital, return_mean, return_stdev, raise_mean, rais
     return pd.DataFrame(sims[:-11,:])
 
 
-def growth_plot(nav_df):
-    # Define the figure and axes
-    fig, ax1 = plt.subplots(1, 1)
+def growth_plot(nav_df, start_year=None):
+    # Create plot
+    p = figure(
+            title='Projected retirement savings balance by year (age)',
+            tools='pan, wheel_zoom, box_zoom, undo, reset, fullscreen',
+            outline_line_color=None)#, sizing_mode='scale_height')
+
+    # Name simulations for legend
+    nav_df.columns = [f'sim{i+1}' for i in nav_df.columns]
 
     # Create x-axis in years
-    thisYear = pd.to_datetime('today').year
+    if start_year == None:
+        thisYear = pd.to_datetime('today').year
+    else:
+        thisYear = int(start_year)
     xlabs = np.linspace(0, nav_df.shape[0]/12, num=nav_df.shape[0]) + thisYear
+    nav_df['xlabs'] = xlabs
 
-    for column in nav_df.columns:
-        ax1.plot(xlabs, nav_df[column], alpha=0.3)
+    # Plot the average
+    nav_df['average'] = nav_df.drop('xlabs', axis=1).mean(1)
+    nav_df['age'] = np.floor(nav_df['xlabs'] - 1986)
+    source = bm.ColumnDataSource(nav_df)
+    al = p.line(x='xlabs', y='average', color='blue', width=2, name='Average', source=source)
+    p.varea(x='xlabs', y1=0, y2='average', color='lightblue', alpha=0.5, source=source)
 
-    ax1.set_xlim(min(xlabs), max(xlabs))
-    ax1.xaxis.set_minor_locator(AutoMinorLocator())
-    xlabels = [item.get_text() for item in ax1.get_xticklabels()]
-    xlabels = [l+f'\n({float(l)-1986})' for l in xlabels]
-    ax1.set_xticklabels(xlabels)
-    ax1.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('${x:,.0f}'))
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.title.set_text('Projected retirement savings balance by year (age)')
-    ax1.grid(True, alpha=0.5)
+    # Tools
+    crosshair = bm.CrosshairTool(dimensions='height',
+                                line_color='grey', line_alpha=0.5)
+    hover = bm.HoverTool(mode='vline', renderers=[al])
+    hover.tooltips = """
+            <h2>${x}{0} | Age @{age}{0}</h2>
+            @{average}{$0,0.00}
+        """
+    p.add_tools(hover, crosshair)
+    p.toolbar.autohide = True
 
-    plt.tight_layout()
+    # Format axes
+    p.xaxis.formatter = CustomJSTickFormatter(code="""
+            return tick + " (" + (tick-1986) + ")"
+        """)
+    p.yaxis.formatter=NumeralTickFormatter(format='$0,0')
+    p.xgrid.grid_line_color = None
 
-    return fig
+    return(p)
+    # show(p)
 
 
 def withdrawal_simulation(start_capital, return_mean, return_stdev, inflation_mean, inflation_stdev, monthly_withdrawal, n_years=30, n_simulations=100):
