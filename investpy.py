@@ -6,8 +6,6 @@ from matplotlib.ticker import AutoMinorLocator
 import bokeh.models as bm
 from bokeh.models import CustomJSTickFormatter, NumeralTickFormatter
 from bokeh.plotting import figure, show, output_file
-# from bokeh.io import output_notebook
-# output_notebook(hide_banner=True)
 
 def sims_matrix(rows, cols, mean, stdev):
     """Create a matrix of simulation adding noise (random numbers) about the mean and standard devation 'stdev'. Rows contain time and columns contain different simulations.
