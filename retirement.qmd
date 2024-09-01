@@ -21,7 +21,7 @@ from shiny import render, reactive, ui
 from bokeh.plotting import figure, show, output_file
 from shinywidgets import render_widget
 from bokeh.io import output_notebook
-output_notebook(hide_banner=True)
+# output_notebook(hide_banner=True)
 
 import inspect
 src_file_path = inspect.getfile(lambda: None)
