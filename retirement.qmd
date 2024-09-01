@@ -11,8 +11,7 @@ server: shiny
 
 ```{python}
 #| context: setup
-import os
-import sys
+import inspect
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -21,9 +20,7 @@ from shiny import render, reactive, ui
 from bokeh.plotting import figure, show, output_file
 from shinywidgets import render_widget
 from bokeh.io import output_notebook
-# output_notebook(hide_banner=True)
 
-import inspect
 src_file_path = inspect.getfile(lambda: None)
 import investpy as ip
 ```
