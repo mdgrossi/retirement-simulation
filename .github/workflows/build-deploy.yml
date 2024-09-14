@@ -30,6 +30,9 @@ jobs:
       - name: Install shinylive python package
         run: python -m pip install shinylive
 
+      - name: Install jupyter-bokeh python package
+        run: python -m pip install jupyter_bokeh
+
       # =====================================================
       # Build
       # =====================================================
