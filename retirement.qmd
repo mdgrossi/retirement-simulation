@@ -151,8 +151,8 @@ def growth_plot(nav_df, start_year=None):
     p.yaxis.formatter=bm.NumeralTickFormatter(format='$0,0')
     p.xgrid.grid_line_color = None
 
-    return(p)
-    # show(p)
+    return p
+    # show p
 
 
 def withdrawal_simulation(start_capital, return_mean, return_stdev, inflation_mean, inflation_stdev, monthly_withdrawal, n_years=30, n_simulations=100):
