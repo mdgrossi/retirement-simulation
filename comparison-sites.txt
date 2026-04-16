@@ -1,0 +1,16 @@
+https://datadrivenmoney.com/calculate-compound-interest-with-contributions-in-python/
+
+https://www.calculator.net/investment-calculator.html?ctype=endamount&ctargetamountv=1%2C000%2C000&cstartingprinciplev=200%2C000&cyearsv=25&cinterestratev=4&ccompound=annually&ccontributeamountv=2%2C000&cadditionat1=end&ciadditionat1=monthly&printit=0&x=Calculate#calresult
+
+https://www.calculator.net/inflation-calculator.html?cstartingamount1=75%2C000&cinmonth1=6&cinyear1=1994&coutmonth1=6&coutyear1=2024&calctype=1&x=Calculate#uscpi
+
+https://www.moneygeek.com/compound-interest-calculator/
+
+https://www.thecalculatorsite.com/finance/calculators/compoundinterestcalculator.php
+
+--
+
+https://wch.github.io/retirement-simulation-dashboard/
+
+https://github.com/wch/retirement-simulation-dashboard/blob/main/retirement.qmd
+
