@@ -1,7 +1,25 @@
-env/
+# Python
 __pycache__/
-*-app.py
-*_files/
-*.html
+*.py[cod]
+*.pyo
 
-/.quarto/
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Exported profile data — may contain real financial figures
+*.json
+
+# Streamlit local state
+.streamlit/secrets.toml
+
+# Accidental brace-expansion directories (zip artifact)
+{*}
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Archives
+*.zip

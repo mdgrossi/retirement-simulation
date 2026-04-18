@@ -1,90 +1,205 @@
-Retirement simulation dashboard
-===============================
+# 📊 Retirement Planning Dashboard
 
-This is a [retirement savings simulation dashboard](https://github.com/wch/retirement-simulation-dashboard), built with [Quarto](https://quarto.org/) and [Shiny](https://shiny.posit.co/py/) for Python. Quarto provides the document structure and layout, and Shiny provides the interactivity.
+A personal retirement planning tool built with Streamlit, featuring Monte Carlo
+simulation, FERS pension modeling, tax-aware analysis, and three-scenario
+spend-down projections.
 
-[![Screenshot of retirement simulation dashboard](./retirement-gallery.png)](https://wch.github.io/retirement-simulation-dashboard/)
+---
 
-[Live dashboard](https://wch.github.io/retirement-simulation-dashboard/)
+## Features
 
-[Learn more](https://quarto.org/docs/dashboards/interactivity/shiny-python/index.html) about using Quarto and Shiny to create interactive dashboards
+- **Monte Carlo simulation** — log-normal, correlated stock/bond returns across
+  1,000+ simulations with percentile fan charts
+- **FERS pension calculator** — immediate and deferred retirement modes, all three
+  survivor benefit elections, FERS Supplement bridge, sub-full COLA
+- **Three retirement scenarios** — Grow / Sustain / Deplete with probability of
+  success and savings rate optimizer
+- **Tax-aware analysis** — Roth vs Traditional comparison, RMD schedule, Roth
+  conversion window, IRMAA risk flags
+- **Dual-life survivor modeling** — income under both-alive / you-die-first /
+  spouse-dies-first states
+- **Inflation toggle** — view all projections in nominal or today's dollars
+- **Export / Import** — save and restore your full profile as JSON
+- **Account types** — TSP (Roth + Traditional), IRA, 401k/403b, HSA (with
+  employer pass-through), taxable brokerage, money market, savings
 
+---
 
-## Deployment to a static web host
+## Prerequisites
 
-This Quarto dashboard uses Shiny for interactivity and is deployed as a static web page to GitHub Pages.
+Choose one path:
 
-A _static_ Quarto dashboard uses Python or R to do computation at _render time_. The result is a static web page which can be deployed to a static web host, such as GitHub Pages.
+| Path | Requirements |
+|---|---|
+| Docker (recommended) | Docker Desktop or Docker Engine + Compose |
+| Local Python | Python 3.11+ |
 
-An _interactive_ Quarto dashboard with Shiny for Python requires a server running Python, because it also does computation at _run time_: when a user interacts with the dashboard, it runs Python code in response to the actions. Normally these interactive dashboards would be deployed on a platform with servers running Python, such as [shinyapps.io](https://www.shinyapps.io/) (Posit's hosted platform) or [Posit Connect](https://posit.co/products/enterprise/connect/) (Posit's on-premises server platform).
+---
 
-However, in many cases a Quarto dashboard with Shiny can also be deployed to a static web host (with some limitations discussed below). This is done by using [Shinylive](https://shiny.posit.co/py/docs/shinylive.html), which is a special deployment mode of Shiny where, instead of running Python on a remote server, _Python itself runs in the web browser_. This means that the dashboard can be deployed as a web page to any static web host, such as GitHub Pages. The static web host does not need to run Python -- it simply serves up files and the user's web browser runs the Python code.
-
-The dashboard in this repository is deployed as a Shinylive app to GitHub Pages.
-
-There are some limitations of Shinylive:
-
-- Not all Python packages can run in the web browser.
-- No secrets: all data and code is sent to the web browser, so it is not appropriate if your code or data contains any information that you want to keep private.
-
-See the [Shinylive documentation](https://shiny.posit.co/py/docs/shinylive.html) for more details.
-
-
-### Deployment instructions
-
-To deploy this dashboard to a static web host, first make sure [Quarto](https://quarto.org/docs/download/) (version 1.4.479 or higher) is installed. Then install the shinylive Python package. This package provides a command line tool named `shinylive`, which is used to convert a normal Shiny app to a Shinylive web page.
-
-```bash
-pip install shinylive --upgrade
-```
-
-Next, create your Quarto dashboard. When you have finished working on your Quarto dashboard, run the following:
+## Quick Start — Docker (Recommended)
 
 ```bash
-quarto render --output-dir _build
+# 1. Unzip and enter the project folder
+unzip retirement_planner.zip
+cd retirement_planner
+
+# 2. Build and start
+docker compose up --build
+
+# 3. Open in your browser
+# http://localhost:8501
 ```
 
-This will generate the following files in `_build/`:
-
-- `retirement.html` - the static HTML file for the dashboard
-- `retirement_files/` - a directory containing JS and CSS files for the dashboard
-- `app.py` - a Python file with the Shiny code
-
-These files collectively constitute a Shiny application. You can run this as a normal Shiny application with `shiny run` to make sure it works as expected.
-
-Now we'll convert it to a static web page using the `shinylive` command line tool:
+To stop:
 
 ```bash
-shinylive export _build _site
+docker compose down
 ```
 
-This will generate a Shinylive bundle in `_site/`. This directory contains the following files:
+**Hot reloading:** The `pages/`, `utils/`, and `Home.py` files are volume-mounted
+into the container. Edits to those files take effect immediately — no rebuild
+needed. You only need to rebuild if you change `requirements.txt`.
 
-- `index.html` - the main HTML file for the dashboard
-- `shinylive/` - a directory containing Shinylive web assets
-- `app.json` - a JSON file that contains all the code and data for the dashboard app, bundled into a single file
+---
 
-You can view the app locally by running:
+## Quick Start — Local Python
 
 ```bash
-python3 -m http.server --directory _site --bind localhost 8008
+# 1. Unzip and enter the project folder
+unzip retirement_planner.zip
+cd retirement_planner
+
+# 2. Create a virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run
+streamlit run Home.py
+
+# 5. Open in your browser
+# http://localhost:8501
 ```
 
-Then visit http://localhost:8008/ in a web browser. If that looks good, you can deploy the `_site/` directory to your static web host. That directory contains everything needed to run the dashboard in a web browser.
+---
 
+## Deployment — Streamlit Community Cloud (Free)
 
-### Automatically deploying to GitHub Pages with GitHub Actions
+This is the recommended way to host the app so it's accessible from any device.
 
-You can deploy your dashboard every time you push to a repository, with GitHub Actions. This repository has a GitHub Actions workflow that does just that. If you would like to use it:
+1. Push the project to a **GitHub repository** (public or private).
+2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+3. Click **New app** and select your repository.
+4. Set **Main file path** to `Home.py`.
+5. Click **Deploy**.
 
-- Ensure that you have a `requirements.txt` that is up to date with your Python dependencies. You can generate this file by running:
-    ```bash
-    pip freeze > requirements.txt
-    ```
-- In the **Settings** tab of your repository, select **Pages** in the sidebar, and then under **Build and deployment** set the **Source** to **GitHub Actions**.
-- Copy the file [`.github/workflows/build-deploy.yml`](.github/workflows/build-deploy.yml) to the same location in your repository, then commit it and push.
+The app will be live at `https://<your-app>.streamlit.app` within a few minutes.
 
-It will then start building and deploying your dashboard. You can view the progress in the **Actions** tab of your repository.
+> **Note:** All data entered in the app is held in session memory only — nothing
+> is written to disk or stored between sessions. Use the **Export Profile** button
+> on the Household Setup sidebar to save your inputs as a JSON file and reload
+> them next time.
 
-If the page successfully deploys, you can view it at `https://<username>.github.io/<repo-name>/`. For example, the dashboard in this repository is deployed at https://wch.github.io/retirement-simulation-dashboard/.
+---
 
+## Project Structure
+
+```
+retirement_planner/
+├── Home.py                        # Landing page and navigation
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── .streamlit/
+│   └── config.toml                # Dark theme configuration
+├── pages/
+│   ├── 1_👥_Household_Setup.py    # Accounts, salaries, export/import
+│   ├── 2_🏛️_Pension_&_Income.py   # FERS pension, SS, guaranteed income
+│   ├── 3_⚙️_Assumptions.py        # Return assumptions, inflation, MC settings
+│   ├── 4_📈_Accumulation.py       # Pre-retirement Monte Carlo
+│   ├── 5_🎯_Three_Scenarios.py    # Grow / Sustain / Deplete comparison
+│   ├── 6_📉_Spend_Down.py         # Retirement drawdown and survivor analysis
+│   └── 7_💰_Tax_Analysis.py       # Roth vs Trad, RMDs, IRMAA, brackets
+└── utils/
+    ├── calculations.py            # Core math: Monte Carlo, FERS, SS, tax, RMDs
+    ├── charts.py                  # Plotly chart factory
+    └── defaults.py                # Placeholder default values and constants
+```
+
+---
+
+## Recommended Workflow
+
+1. **Household Setup** — Enter accounts and salaries for both partners. Use
+   placeholder/anonymized values if you prefer not to store real numbers.
+2. **Pension & Income** — Configure your FERS details (immediate or deferred),
+   Social Security estimates, and the SS include/exclude toggle.
+3. **Assumptions** — Adjust return expectations, inflation, and retirement ages.
+   The return distribution preview updates live.
+4. **Accumulation** — Run the Monte Carlo to see portfolio growth to retirement.
+   Check the teal dotted salary line — that is the trajectory used to compute
+   your FERS high-3.
+5. **Three Scenarios** — The core page. Set spending targets for each scenario and
+   run all three. Use the savings rate optimizer to see whether you are on track.
+6. **Spend-Down** — Drill into a single spending target with full income waterfall,
+   survivor analysis, and sequence-of-returns risk callout.
+7. **Tax Analysis** — Compare Roth vs Traditional, identify your Roth conversion
+   window, and check for IRMAA exposure.
+8. **Export your profile** — Use the sidebar on Household Setup to download your
+   inputs as JSON. Upload the same file next session to avoid re-entering data.
+
+---
+
+## Key Assumptions and Methodology
+
+### Monte Carlo
+Returns are drawn from a log-normal distribution parameterized by arithmetic mean
+and standard deviation. Stock and bond returns are correlated using Cholesky
+decomposition (default correlation: −0.20). Each simulation runs independently
+from today through the last survivor's life expectancy.
+
+### FERS Pension
+- **Immediate retirement:** Multiplier is 1.0% × high-3 × YOS, or 1.1% if
+  retiring at age 62+ with 20+ years of service. High-3 is the average of the
+  three highest consecutive years of basic pay, projected using your raise rate
+  assumption with random noise.
+- **Deferred retirement:** High-3 and YOS are frozen at separation. No FERS
+  Supplement. No COLA accrues between separation and collection start.
+- **FERS COLA:** Sub-full CPI per statute — CPI minus 1 percentage point when
+  inflation exceeds 3%, full CPI when between 2–3%, and full CPI when below 2%.
+- **Survivor benefit:** Three OPM options modeled — None (0% reduction),
+  Partial / 25% to survivor (5% reduction), Full / 50% to survivor (10%
+  reduction).
+
+### Social Security
+Benefits are adjusted for early or delayed claiming relative to your Full
+Retirement Age using the SSA's standard reduction/credit factors. A toggle on
+the Pension & Income page excludes SS from all income projections for
+conservative planning.
+
+### Taxes
+Federal income tax is estimated using Married Filing Jointly brackets, inflated
+forward each year. State taxes are not modeled. RMDs follow the IRS Uniform
+Lifetime Table under SECURE 2.0 (starting age 73). IRMAA thresholds are based
+on 2024 MFJ brackets.
+
+### Inflation
+All projections run internally in nominal dollars. The global "Today's Dollars"
+toggle divides every value by the cumulative inflation factor to show real
+purchasing power.
+
+---
+
+## Disclaimer
+
+This tool is for personal planning and educational purposes only. It is not
+financial, legal, or tax advice. Consult a qualified financial advisor, CPA, or
+attorney before making retirement, investment, or tax decisions. All default
+values are placeholders and do not represent any real individual's finances.
+
+FERS rules summarized here are based on OPM guidance current as of early 2025.
+Rules, brackets, and thresholds may change. Verify details at
+[opm.gov](https://www.opm.gov/retirement-services/) and
+[ssa.gov](https://www.ssa.gov).
