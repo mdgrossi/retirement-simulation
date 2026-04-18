@@ -1,0 +1,14 @@
+services:
+  retirement-planner:
+    build: .
+    container_name: retirement-planner
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount pages/ and utils/ so you can edit files without rebuilding
+      - ./pages:/app/pages
+      - ./utils:/app/utils
+      - ./Home.py:/app/Home.py
+    restart: unless-stopped
+    environment:
+      - STREAMLIT_THEME_BASE=dark
