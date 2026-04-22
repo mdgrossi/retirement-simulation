@@ -51,7 +51,7 @@ def _fmt_m(v: float) -> str:
 
 def fan_chart(
     x:       np.ndarray,
-    pcts:    Dict[str, np.ndarray],   # {"p5", "p10", ..., "p95"}
+    pcts:    Dict[str, np.ndarray],
     title:   str,
     color:   str   = TEAL,
     x_label: str   = "Year",
@@ -101,6 +101,7 @@ def fan_chart(
     layout["yaxis"]["tickformat"] = "$,.0f"
 
     fig.update_layout(**layout)
+    _add_crosshair(fig)
     return fig
 
 def multi_scenario_fan(
@@ -142,6 +143,7 @@ def multi_scenario_fan(
     layout["yaxis"]["title"] = "Portfolio Value (Today's $)" if use_real else "Portfolio Value"
     layout["yaxis"]["tickformat"] = "$,.0f"
     fig.update_layout(**layout)
+    _add_crosshair(fig)
     return fig
 
 # ─── Accumulation Stacked Area ────────────────────────────────────────────────
@@ -174,6 +176,7 @@ def stacked_account_area(
     layout["yaxis"]["title"] = "Balance (Today's $)" if use_real else "Balance"
     layout["yaxis"]["tickformat"] = "$,.0f"
     fig.update_layout(**layout)
+    _add_crosshair(fig)
     return fig
 
 # ─── Income Waterfall / Stacked Bar ──────────────────────────────────────────
@@ -213,6 +216,7 @@ def income_waterfall(income_df: pd.DataFrame, use_real: bool = False,
     layout["yaxis"]["tickformat"] = "$,.0f"
     layout["barmode"] = "stack"
     fig.update_layout(**layout)
+    _add_crosshair(fig)
     return fig
 
 # ─── Roth vs Traditional ──────────────────────────────────────────────────────
@@ -266,6 +270,7 @@ def roth_vs_trad_chart(result: Dict) -> go.Figure:
     layout["yaxis"]["title"] = "After-Tax Portfolio Value"
     layout["yaxis"]["tickformat"] = "$,.0f"
     fig.update_layout(**layout)
+    _add_crosshair(fig)
     return fig
 
 # ─── Probability Gauge ────────────────────────────────────────────────────────
@@ -298,32 +303,20 @@ def prob_gauge(prob: float, label: str, color: str = TEAL) -> go.Figure:
 
 # ─── Tax Rate Timeline ────────────────────────────────────────────────────────
 
-def tax_rate_timeline(ages: np.ndarray, incomes: np.ndarray,
-                       inflation: float = 0.03) -> go.Figure:
-    """Marginal and effective tax rate over retirement."""
-    from utils.calculations import calculate_federal_tax, get_marginal_rate
-    marginals  = [get_marginal_rate(inc, t, inflation) * 100 for t, inc in enumerate(incomes)]
-    effectives = [calculate_federal_tax(inc, t, inflation) / max(inc, 1) * 100
-                  for t, inc in enumerate(incomes)]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ages, y=marginals,  name="Marginal Rate",
-                              line=dict(color=AMBER, width=2)))
-    fig.add_trace(go.Scatter(x=ages, y=effectives, name="Effective Rate",
-                              line=dict(color=TEAL, width=2)))
-
-    layout = dict(**BASE_LAYOUT)
-    layout["title"] = dict(text="Federal Tax Rates in Retirement",
-                            font=dict(size=16, color=TEXT), x=0.02)
-    layout["xaxis"]["title"] = "Your Age"
-    layout["yaxis"]["title"] = "Tax Rate (%)"
-    layout["yaxis"]["ticksuffix"] = "%"
-    fig.update_layout(**layout)
-    return fig
-
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _hex_to_rgb(hex_color: str) -> str:
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"{r},{g},{b}"
+
+def _add_crosshair(fig: go.Figure) -> go.Figure:
+    """Add crosshair spike lines and unified hover to any Plotly figure."""
+    fig.update_xaxes(
+        showspikes=True, spikemode="across", spikesnap="cursor",
+        spikecolor="#8b949e", spikethickness=1, spikedash="dot")
+    fig.update_yaxes(
+        showspikes=True, spikemode="across", spikesnap="cursor",
+        spikecolor="#8b949e", spikethickness=1, spikedash="dot")
+    fig.update_layout(hovermode="x unified")
+    return fig

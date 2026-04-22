@@ -221,7 +221,8 @@ def calculate_fers_pension(
     survivor_pension = base_pension * surv_share
 
     mra = get_fers_mra(birth_year)
-    supplement_frac = min(total_yos / 40.0, 1.0) if not deferred else 0.0
+    supplement_frac = (min(total_yos / 40.0, 1.0)
+                       if (has_supplement and not deferred) else 0.0)
 
     return {
         "pension_sims":         net_pension,
@@ -441,6 +442,7 @@ def run_distribution_mc(
     ss_you_start      = income_sources.get("ss_you_start_age", 67)
     ss_spouse_start   = income_sources.get("ss_spouse_start_age", 67)
     survivor_benefit  = income_sources.get("survivor_benefit", True)
+    survivor_share    = income_sources.get("survivor_share",   0.50)  # actual elected share
 
     portfolio = np.copy(initial_sims).astype(float)
     paths = np.zeros((n_sims, n_years + 1))
@@ -462,7 +464,7 @@ def run_distribution_mc(
         if you_alive:
             pen = pension_nominal * (1 + pension_cola) ** t
         else:
-            pen = pension_nominal * (1 + pension_cola) ** t * (0.50 if survivor_benefit else 0.0)
+            pen = pension_nominal * (1 + pension_cola) ** t * (survivor_share if survivor_benefit else 0.0)
 
         # FERS Supplement (only for you, only before age 62)
         supp = supplement_annual * inf_t if (you_alive and age_you < 62) else 0.0
@@ -638,6 +640,47 @@ def estimate_needed_portfolio(
         pv_annuity  = annual_gap * (1 - (1 + r) ** -years_retirement) / r
         pv_reserve  = reserve / (1 + r) ** years_retirement
         return pv_annuity + pv_reserve
+
+def calculate_scenario_spending(
+    portfolio_p50:    float,
+    guaranteed_income: float,
+    years_retirement: int,
+    real_return:      float,
+    reserve:          float = 75_000,
+    grow_rate:        float = 0.005,
+) -> dict:
+    """
+    Given a projected portfolio at retirement (P50) and guaranteed income floor,
+    calculate the annual spending that defines each scenario.
+
+    Grow:    spending = guaranteed + portfolio × (real_return - grow_rate)
+             Portfolio grows at grow_rate in real terms.
+    Sustain: spending = guaranteed + portfolio × real_return
+             Portfolio stays flat in real terms (perpetuity).
+    Deplete: spending = guaranteed + annuity payment that draws portfolio
+             from current value down to reserve by end of years_retirement.
+    """
+    r = max(real_return, 0.0001)
+
+    grow_gap    = max(portfolio_p50 * (r - grow_rate), 0.0)
+    sustain_gap = portfolio_p50 * r
+
+    # Deplete: annuity that draws (portfolio - PV_reserve) over n years
+    pv_reserve  = reserve / (1 + r) ** years_retirement
+    usable      = max(portfolio_p50 - pv_reserve, 0.0)
+    if usable > 0 and years_retirement > 0:
+        deplete_gap = usable * r / (1 - (1 + r) ** -years_retirement)
+    else:
+        deplete_gap = sustain_gap  # fallback
+
+    return {
+        "grow_spending":    round(guaranteed_income + grow_gap,    -2),
+        "sustain_spending": round(guaranteed_income + sustain_gap, -2),
+        "deplete_spending": round(guaranteed_income + deplete_gap, -2),
+        "grow_gap":    grow_gap,
+        "sustain_gap": sustain_gap,
+        "deplete_gap": deplete_gap,
+    }
 
 def additional_contribution_needed(
     portfolio_target:   float,

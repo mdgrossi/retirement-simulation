@@ -1,24 +1,23 @@
-"""
-Page 4 — Accumulation
-Monte Carlo portfolio growth from now to retirement.
-"""
+"""Page 4 — Accumulation"""
 
 import streamlit as st
 import numpy as np
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 from utils.calculations import run_accumulation_mc
-from utils.charts import fan_chart, stacked_account_area
+from utils.charts import fan_chart, stacked_account_area, _add_crosshair
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Accumulation", layout="wide")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.card { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:18px 22px; margin-bottom:14px; }
-.kpi { font-size:1.8rem; font-weight:700; color:#00d4aa; }
-.kpi-label { font-size:0.8rem; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; }
+html,body,[class*="css"]{font-family:'Inter',sans-serif;}
+.card{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:18px 22px;margin-bottom:14px;}
+.kpi{font-size:1.8rem;font-weight:700;color:#00d4aa;}
+.kpi-label{font-size:0.8rem;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;}
+.tip{background:rgba(0,212,170,0.07);border:1px solid rgba(0,212,170,0.2);border-radius:8px;
+     padding:10px 14px;font-size:.85rem;color:#8b949e;margin-bottom:14px;}
 </style>""", unsafe_allow_html=True)
 
 def fmt_m(v):
@@ -27,136 +26,168 @@ def fmt_m(v):
     return f"${v:,.0f}"
 
 st.markdown("## 📈 Accumulation Phase")
-st.markdown("<p style='color:#8b949e;'>Monte Carlo projection of portfolio growth from today to retirement. "
-            "Includes all accounts, salary growth, and contribution scaling.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#8b949e;'>Monte Carlo projection of your combined household "
+            "portfolio from today to retirement. Contributions scale with salary growth, "
+            "and each account's individual allocation is respected.</p>",
+            unsafe_allow_html=True)
 
 persons     = st.session_state.get("persons", [])
 assumptions = st.session_state.get("assumptions", {})
 
 if not persons:
-    st.warning("Set up your household first on the Household Setup page.")
-    st.stop()
+    st.warning("Set up your household first on the **Household Setup** page."); st.stop()
 
-# ── Controls
+st.markdown("<div class='tip'>"
+            "Click <b>Run Accumulation Monte Carlo</b> after changing any settings on the "
+            "Household Setup or Assumptions pages. Results are cached until you re-run. "
+            "The fan chart shows 1,000 (or your chosen number of) independent future scenarios — "
+            "the shaded bands represent the range of likely outcomes, not a single prediction."
+            "</div>", unsafe_allow_html=True)
+
 c1, c2, c3 = st.columns([1, 1, 2])
 with c1:
-    use_real = st.toggle("Show Today's Dollars (inflation-adjusted)",
-                          assumptions.get("show_real_dollars", False))
+    use_real = st.toggle(
+        "Show Today's Dollars", assumptions.get("show_real_dollars", False),
+        help="Divide all portfolio values by the cumulative inflation factor to show "
+             "purchasing power in today's dollars rather than future nominal dollars.")
 with c2:
-    show_spaghetti = st.toggle("Show sample simulation paths", False,
-                                help="Shows 50 individual simulation paths behind the fan chart.")
+    show_spaghetti = st.toggle(
+        "Show sample paths", False,
+        help="Overlay 50 individual simulation paths behind the fan chart. Useful for "
+             "seeing the range and shape of individual outcomes, including the rare "
+             "catastrophic and exceptional runs.")
 
-run_btn = st.button("▶ Run Accumulation Monte Carlo", type="primary")
+
+import hashlib, json
+
+def _fingerprint(persons, assumptions):
+    key = json.dumps({
+        "p": [(p.get("age"), str(p.get("accounts")), str(p.get("salaries"))) for p in persons],
+        "a": assumptions,
+    }, default=str, sort_keys=True)
+    return hashlib.md5(key.encode()).hexdigest()[:10]
+
+cur_fp = _fingerprint(persons, assumptions)
+if ("accum_fp" in st.session_state
+        and st.session_state["accum_fp"] != cur_fp
+        and "accum_result" in st.session_state):
+    st.warning("⚠️ Inputs have changed since the last run. "
+               "Click **Run Accumulation Monte Carlo** to refresh.")
+
+run_btn = st.button("▶ Run Accumulation Monte Carlo", type="primary",
+                     help=f"Runs {assumptions.get('n_simulations',1000):,} simulations. "
+                          "Re-run after changing accounts, salaries, or assumptions.")
 
 if run_btn or "accum_result" not in st.session_state:
     with st.spinner(f"Running {assumptions.get('n_simulations',1000):,} simulations…"):
         result = run_accumulation_mc(persons, assumptions, seed=42)
         st.session_state["accum_result"] = result
+        st.session_state["accum_fp"]     = cur_fp
 
 result = st.session_state.get("accum_result")
 if not result:
-    st.info("Click **Run Accumulation Monte Carlo** to generate projections.")
-    st.stop()
+    st.info("Click **Run Accumulation Monte Carlo** above to generate projections."); st.stop()
 
-n_years  = result["n_years"]
-age_you  = persons[0]["age"]
-ages     = np.arange(age_you, age_you + n_years + 1)
-ret_age  = assumptions.get("retirement_age_you", 62)
-pcts     = result["pct_real"] if use_real else result["pct_nom"]
+n_years = result["n_years"]
+age_you = persons[0]["age"]
+ages    = np.arange(age_you, age_you + n_years + 1)
+ret_age = assumptions.get("retirement_age_you", 62)
+pcts    = result["pct_real"] if use_real else result["pct_nom"]
 
-# ── KPI row at retirement year
 yr_at_retire = max(ret_age - age_you, 0)
-yr_idx = min(yr_at_retire, n_years)
+yr_idx       = min(yr_at_retire, n_years)
 
+# KPIs
 k1, k2, k3, k4 = st.columns(4)
 suffix = " (today's $)" if use_real else ""
-with k1:
-    st.markdown(f"""<div class='card'>
-        <div class='kpi-label'>Portfolio at Retirement (Median){suffix}</div>
-        <div class='kpi'>{fmt_m(pcts['p50'][yr_idx])}</div>
-        <div style='color:#8b949e;font-size:.82rem;'>
-            P10: {fmt_m(pcts['p10'][yr_idx])} · P90: {fmt_m(pcts['p90'][yr_idx])}
-        </div>
-    </div>""", unsafe_allow_html=True)
-with k2:
-    total_now = sum(a["balance"] for p in persons for a in p.get("accounts", []))
-    st.markdown(f"""<div class='card'>
-        <div class='kpi-label'>Current Total Portfolio</div>
-        <div class='kpi'>{fmt_m(total_now)}</div>
-        <div style='color:#8b949e;font-size:.82rem;'>Across all accounts</div>
-    </div>""", unsafe_allow_html=True)
-with k3:
-    total_contrib = sum(
-        a.get("annual_contribution", 0) + a.get("employer_match", 0)
-        for p in persons for a in p.get("accounts", [])
-    )
-    st.markdown(f"""<div class='card'>
-        <div class='kpi-label'>Annual Contributions (today)</div>
-        <div class='kpi'>{fmt_m(total_contrib)}</div>
-        <div style='color:#8b949e;font-size:.82rem;'>Scales with salary growth</div>
-    </div>""", unsafe_allow_html=True)
-with k4:
-    sal_p50 = result["salary_p50"]
-    final_sal = sal_p50[min(yr_at_retire, len(sal_p50)-1)]
-    st.markdown(f"""<div class='card'>
-        <div class='kpi-label'>Salary at Retirement (Median)</div>
-        <div class='kpi'>{fmt_m(final_sal)}</div>
-        <div style='color:#8b949e;font-size:.82rem;'>Combined household</div>
-    </div>""", unsafe_allow_html=True)
+k1.markdown(f"""<div class='card'>
+    <div class='kpi-label'>Portfolio at Retirement (Median){suffix}</div>
+    <div class='kpi'>{fmt_m(pcts['p50'][yr_idx])}</div>
+    <div style='color:#8b949e;font-size:.82rem;'>
+        P10: {fmt_m(pcts['p10'][yr_idx])} · P90: {fmt_m(pcts['p90'][yr_idx])}<br>
+        80% of simulations land in this range</div>
+</div>""", unsafe_allow_html=True)
+
+total_now = sum(a["balance"] for p in persons for a in p.get("accounts", []))
+k2.markdown(f"""<div class='card'>
+    <div class='kpi-label'>Current Total Portfolio</div>
+    <div class='kpi'>{fmt_m(total_now)}</div>
+    <div style='color:#8b949e;font-size:.82rem;'>Starting point across all accounts</div>
+</div>""", unsafe_allow_html=True)
+
+total_contrib = sum(
+    a.get("annual_contribution", 0) + a.get("employer_match_pct", 0) / 100
+    * sum(s.get("amount", 0) for s in p.get("salaries", []))
+    for p in persons for a in p.get("accounts", []))
+k3.markdown(f"""<div class='card'>
+    <div class='kpi-label'>Annual Contributions (today)</div>
+    <div class='kpi'>{fmt_m(total_contrib)}</div>
+    <div style='color:#8b949e;font-size:.82rem;'>Scales proportionally with salary growth</div>
+</div>""", unsafe_allow_html=True)
+
+sal_p50   = result["salary_p50"]
+final_sal = sal_p50[min(yr_at_retire, len(sal_p50)-1)]
+k4.markdown(f"""<div class='card'>
+    <div class='kpi-label'>Salary at Retirement (Median)</div>
+    <div class='kpi'>{fmt_m(final_sal)}</div>
+    <div style='color:#8b949e;font-size:.82rem;'>Combined household · nominal</div>
+</div>""", unsafe_allow_html=True)
 
 st.markdown("")
 
-# ── Fan chart
+# Fan chart
 fig = fan_chart(
-    x       = ages,
-    pcts    = pcts,
-    title   = "Portfolio Growth to Retirement  (Today's Dollars)" if use_real else "Portfolio Growth to Retirement",
-    color   = "#00d4aa",
-    x_label = "Your Age",
-    y_label = "Portfolio Value",
-    x_is_age=True,
-)
-
-# Retirement marker
+    x=ages, pcts=pcts,
+    title="Portfolio Growth to Retirement" + ("  (Today's Dollars)" if use_real else ""),
+    color="#00d4aa", x_label="Your Age", y_label="Portfolio Value", x_is_age=True)
 fig.add_vline(x=ret_age, line_dash="dash", line_color="#8b949e",
               annotation_text=f"Retire age {ret_age}", annotation_font_color="#8b949e")
 
-# Spaghetti paths (50 random sims)
+
 if show_spaghetti:
     paths = result["portfolio_real"] if use_real else result["portfolio_paths"]
-    idx = np.random.default_rng(0).choice(result["n_sims"], size=min(50, result["n_sims"]), replace=False)
+    idx = np.random.default_rng(0).choice(result["n_sims"],
+                                           size=min(50, result["n_sims"]), replace=False)
     for i in idx:
-        fig.add_trace(
-            __import__("plotly.graph_objects", fromlist=["Scatter"]).Scatter(
-                x=ages, y=paths[i],
-                line=dict(color="rgba(0,212,170,0.08)", width=1),
-                showlegend=False, hoverinfo="skip",
-            )
-        )
+        fig.add_trace(go.Scatter(
+            x=ages, y=paths[i],
+            line=dict(color="rgba(0,212,170,0.08)", width=1),
+            showlegend=False, hoverinfo="skip"))
 
 st.plotly_chart(fig, width='stretch')
+st.caption(
+    "**Fan chart guide:** The dark center line is the median (50th percentile) outcome — "
+    "half of simulations end above this, half below. "
+    "The medium band covers the 25th–75th percentile (middle 50% of outcomes). "
+    "The light outer band covers the 10th–90th percentile (middle 80% of outcomes). "
+    "The dashed vertical line marks your target retirement age. "
+    "Wide bands = high uncertainty; narrow bands = more predictable trajectory.")
 
-# ── Account breakdown
+# Stacked area
 st.markdown("### Account Breakdown (Median)")
 fig2 = stacked_account_area(result["acct_medians"], ages, use_real=use_real)
 fig2.add_vline(x=ret_age, line_dash="dash", line_color="#8b949e")
-st.plotly_chart(fig2, width='stretch')
 
-# ── Salary trajectory
+st.plotly_chart(fig2, width='stretch')
+st.caption(
+    "Median balance of each account stacked on top of each other. "
+    "Each color represents one account. The total height of the stack equals the "
+    "median portfolio value from the fan chart above. Useful for seeing which accounts "
+    "are doing the heavy lifting and whether your mix is diversified across account types.")
+
+# Salary chart
 st.markdown("### Salary Trajectory (Median)")
-import plotly.graph_objects as go
 fig3 = go.Figure()
 sal_real = result["salary_p50"] / result["inf_factors"]
-fig3.add_trace(go.Scatter(x=ages[:len(result["salary_p50"])], y=result["salary_p50"],
-                           name="Combined Household (nominal)",
-                           line=dict(color="#f0883e", width=2)))
-fig3.add_trace(go.Scatter(x=ages[:len(sal_real)], y=sal_real,
-                           name="Combined Household (today's $)",
-                           line=dict(color="#f0883e", width=2, dash="dash")))
+fig3.add_trace(go.Scatter(
+    x=ages[:len(result["salary_p50"])], y=result["salary_p50"],
+    name="Combined Household (nominal)", line=dict(color="#f0883e", width=2)))
+fig3.add_trace(go.Scatter(
+    x=ages[:len(sal_real)], y=sal_real,
+    name="Combined Household (today's $)", line=dict(color="#f0883e", width=2, dash="dash")))
 
-# FERS person salary separately (used for pension high-3)
 fers_person = next((p for p in persons if p.get("has_fers")), None)
-if fers_person and "fers_salary_p50" in result:
+if fers_person and "fers_salary_p50" in result and result["fers_salary_p50"] is not None:
     fig3.add_trace(go.Scatter(
         x=ages[:len(result["fers_salary_p50"])],
         y=result["fers_salary_p50"],
@@ -165,18 +196,19 @@ if fers_person and "fers_salary_p50" in result:
 
 fig3.update_layout(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#e6edf3"), xaxis=dict(title="Age", gridcolor="#21262d"),
+    font=dict(color="#e6edf3"),
+    xaxis=dict(title="Age", gridcolor="#21262d"),
     yaxis=dict(title="Salary", tickformat="$,.0f", gridcolor="#21262d"),
-    legend=dict(bgcolor="rgba(22,27,34,0.8)", bordercolor="#21262d", borderwidth=1),
-)
+    legend=dict(bgcolor="rgba(22,27,34,0.8)", bordercolor="#21262d", borderwidth=1))
+_add_crosshair(fig3)
 st.plotly_chart(fig3, width='stretch')
-
 st.caption(
-    "🏛️ **Pension note:** The teal dotted line shows the FERS person's individual salary — "
-    "this is the trajectory used to compute the **high-3** for pension calculations. "
-    "The high-3 is the average of the final 3 years of that line before retirement. "
-    "The orange combined line is for contribution scaling only."
-)
+    "**Orange (solid):** Combined household salary in future (nominal) dollars, growing with "
+    "your raise rate assumption plus random noise. Used to scale contributions each year. "
+    "**Orange (dashed):** Same salary in today's purchasing power — notice real salary growth "
+    "is slower than nominal because inflation erodes some of the raise. "
+    "**Teal (dotted):** The FERS person's individual salary only. "
+    "This is the exact trajectory used to compute the pension **high-3** — "
+    "the average of the final 3 years of this line before retirement.")
 
-# Save final portfolio distribution for use in scenarios
 st.session_state["_final_portfolio_sims"] = result["final_portfolio_sims"]
