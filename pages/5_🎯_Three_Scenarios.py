@@ -142,9 +142,17 @@ st.markdown("<div class='tip'>"
             + "</div>", unsafe_allow_html=True)
 
 # Target portfolio analysis
-gtot_floor = (inc.get("pension_annual", 0) if inc else 0) + \
-             (inc.get("ss_you_annual", 0) if inc else 0) + \
-             (inc.get("ss_spouse_annual", 0) if inc else 0)
+# Always read guaranteed income live from session state — don't depend on stale scenario cache
+_gi_live = st.session_state.get("_guaranteed_income", {})
+include_ss = st.session_state.get("include_ss", True)
+gtot_floor = (
+    _gi_live.get("pension",    0) +
+    _gi_live.get("supplement", 0) +
+    (_gi_live.get("ss", 0) if include_ss else 0)
+)
+if gtot_floor == 0 and not _gi_live:
+    st.info("💡 Visit **Pension & Income** first to load your guaranteed income floor. "
+            "Without it, the analysis assumes your portfolio must cover the full spending target.")
 
 ta1, ta2, ta3, ta4 = st.columns(4)
 target_income = ta1.number_input(
@@ -158,6 +166,49 @@ ret_you_ta  = assumptions.get("retirement_age_you", 62)
 yrs_dist_ta = max(le_you_ta - ret_you_ta, 1)
 real_ret_ta = (assumptions.get("stock_return", 7.0) - assumptions.get("inflation_rate", 3.0)) / 100
 gap_ta      = max(target_income - gtot_floor, 0)
+
+with st.expander("📐 How these numbers are calculated", expanded=False):
+    st.markdown(f"""
+**Step 1 — Portfolio gap:**
+`Gap = Desired income − Guaranteed income floor`
+`Gap = {hfmt(target_income)} − {hfmt(gtot_floor)} = {hfmt(gap_ta)}/yr`
+
+The guaranteed floor is your pension + FERS supplement + Social Security (if included).
+Your portfolio only needs to cover the *gap* — not the full spending target.
+
+**Step 2 — Required portfolio by scenario** (real return = {real_ret_ta*100:.1f}%):
+
+| Scenario | Formula | Required |
+|---|---|---|
+| 🌱 Grow | `Gap ÷ (real_r − 1%)` | Most capital — portfolio grows 1%/yr in real terms |
+| ⚖️ Sustain | `Gap ÷ real_r` | Middle — perpetuity, balance never changes |
+| 📉 Deplete | PV of annuity over {yrs_dist_ta} yrs + PV of reserve | Least capital — principal spent down |
+
+**How the 4% rule fits in:**
+
+The famous 4% rule says: `Portfolio needed = Annual income ÷ 4%`.
+That is mathematically identical to the **Sustain** perpetuity formula when real return = 4%.
+They are the same equation: `gap / 0.04`.
+
+The Trinity Study (1998) found that this portfolio size gave a ~95% historical survival
+rate over 30 years. "Survival" means the portfolio didn't hit zero — not that it stayed
+flat. In many scenarios it shrank; in good ones it grew. The 4% rule is agnostic about
+what happens to the balance; it only bounds the probability of ruin.
+
+**Therefore:**
+- **Grow** requires *more* than the 4% rule — you need extra capital to fund ongoing growth
+- **Sustain** *equals* the 4% rule portfolio — same formula, `gap ÷ real_r`
+- **Deplete** requires *less* than the 4% rule — you're spending principal over {yrs_dist_ta} years,
+  so a smaller lump sum is sufficient (present value of a finite annuity, not a perpetuity)
+
+The 5.9% withdrawal rate on Deplete is intentional: at that rate, the portfolio is
+exhausted near life expectancy. The Monte Carlo fan charts on this page show the full
+probability distribution; use those as your primary planning tool.
+
+**Step 3 — P50 projected portfolio:**
+Reads your median portfolio at retirement from the Accumulation Monte Carlo.
+Run that page first for an accurate comparison.
+""")  
 
 ta2.markdown(f"""<div class='card'>
     <div class='kpi-label'>Guaranteed Income Floor</div>

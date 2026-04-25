@@ -168,9 +168,16 @@ trajectory — exactly what feeds the High-3 calculation.
 """)
 
         # Calculate pension
-        primary_salary = sum(s.get("amount", 0) for s in person.get("salaries", []))
-        raise_r = np.mean([s.get("raise_rate",  3.0) for s in person.get("salaries", [])]) / 100
-        raise_n = np.mean([s.get("raise_noise", 0.4) for s in person.get("salaries", [])]) / 100
+        # Only salaries marked as FERS basic pay feed the high-3
+        fers_basic_sals = [s for s in person.get("salaries", [])
+                           if s.get("is_fers_basic_pay", True)]
+        if not fers_basic_sals:
+            st.warning("⚠️ No salary is marked as FERS basic pay. "
+                       "Toggle at least one salary as FERS basic pay on the "
+                       "Household Setup page to compute the pension high-3.")
+        primary_salary = sum(s.get("amount", 0) for s in fers_basic_sals)
+        raise_r = np.mean([s.get("raise_rate",  3.0) for s in fers_basic_sals] or [3.0]) / 100
+        raise_n = np.mean([s.get("raise_noise", 0.4) for s in fers_basic_sals] or [0.4]) / 100
 
         result = calculate_fers_pension(
             years_service_current = fers["years_service_current"],

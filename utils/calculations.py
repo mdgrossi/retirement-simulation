@@ -17,17 +17,18 @@ RMD_TABLE: Dict[int, float] = {
     102: 5.6, 103: 5.2, 104: 4.9, 105: 4.6,
 }
 
-# ─── 2024 Federal Tax Brackets (Married Filing Jointly) ──────────────────────
+# ─── 2026 Federal Tax Brackets (Married Filing Jointly) ──────────────────────
+# Source: IRS Revenue Procedure 2025-32 / IRS newsroom release
 TAX_BRACKETS_MFJ = [
-    (23_200,        0.10),
-    (94_300,        0.12),
-    (201_050,       0.22),
-    (383_900,       0.24),
-    (487_450,       0.32),
-    (731_200,       0.35),
+    (24_800,        0.10),
+    (100_800,       0.12),
+    (211_400,       0.22),
+    (403_550,       0.24),
+    (512_450,       0.32),
+    (768_700,       0.35),
     (float("inf"),  0.37),
 ]
-STANDARD_DEDUCTION_MFJ = 29_200  # 2024
+STANDARD_DEDUCTION_MFJ = 32_200  # 2026 MFJ standard deduction
 
 # ─── FERS MRA Table (OPM) ────────────────────────────────────────────────────
 def get_fers_mra(birth_year: int) -> int:
@@ -306,17 +307,29 @@ def run_accumulation_mc(
     for i, a in enumerate(all_accounts):
         acct_paths[i, :, 0] = a["balance"]
 
-    # ── Salary trajectories for contribution scaling
+    # ── Salary trajectories — each source modelled independently then summed
+    # This ensures a fixed-wage source stays flat while a growing source grows,
+    # and the FERS basic-pay subset can never exceed the total.
     sal_paths = np.zeros((2, n_sims, n_years + 1))
+    # Also store per-salary-source paths for the FERS high-3 calculation
+    _person_sal_source_paths = [[] for _ in range(2)]  # list of (n_sims, n_years+1) per source
+
     for pi, person in enumerate(persons):
         if pi >= 2: break
-        total_sal = sum(s["amount"] for s in person.get("salaries", [{}]))
-        rr  = np.mean([s.get("raise_rate",  3.0) for s in person.get("salaries", [{}])]) / 100.0
-        rn  = np.mean([s.get("raise_noise", 0.4) for s in person.get("salaries", [{}])]) / 100.0
-        sal_paths[pi, :, 0] = total_sal
-        for t in range(n_years):
-            noise = rng.normal(0, rn, n_sims)
-            sal_paths[pi, :, t + 1] = sal_paths[pi, :, t] * (1 + rr + noise)
+        salaries = person.get("salaries", [])
+        if not salaries:
+            continue
+        for sal in salaries:
+            amount = sal.get("amount", 0)
+            rr = sal.get("raise_rate",  3.0) / 100.0
+            rn = sal.get("raise_noise", 0.4) / 100.0
+            src_path = np.zeros((n_sims, n_years + 1))
+            src_path[:, 0] = amount
+            for t in range(n_years):
+                noise = rng.normal(0, rn, n_sims)
+                src_path[:, t + 1] = src_path[:, t] * (1 + rr + noise)
+            sal_paths[pi] += src_path          # accumulate into person total
+            _person_sal_source_paths[pi].append((sal, src_path))
 
     # ── Accumulation loop
     for t in range(n_years):
@@ -367,10 +380,27 @@ def run_accumulation_mc(
 
     total_sal_paths = sal_paths.sum(axis=0)  # (n_sims, n_years+1)
 
-    # FERS person salary path (person index 0 if has_fers)
+    # Per-person salary medians (sum of all their independently-modelled sources)
+    person_sal_p50 = [
+        np.percentile(sal_paths[pi], 50, axis=0)
+        for pi in range(min(len(persons), 2))
+    ]
+
+    # FERS person salary path — sum only FERS-basic-pay sources from the paths already simulated.
+    # Because these are a strict subset of sal_paths[fers_pi], the FERS line can never exceed
+    # the person's total salary line.
     fers_pi = next((i for i, p in enumerate(persons) if p.get("has_fers")), None)
-    fers_sal_p50 = (np.percentile(sal_paths[fers_pi], 50, axis=0)
-                    if fers_pi is not None else None)
+    fers_sal_p50 = None
+    if fers_pi is not None:
+        source_pairs = _person_sal_source_paths[fers_pi]  # [(sal_dict, path), ...]
+        fers_sources = [(sal, path) for sal, path in source_pairs
+                        if sal.get("is_fers_basic_pay", False)]
+        if not fers_sources:
+            # No salary explicitly marked — fall back to all (backward compat)
+            fers_sources = source_pairs
+        if fers_sources:
+            fers_combined = sum(path for _, path in fers_sources)
+            fers_sal_p50  = np.percentile(fers_combined, 50, axis=0)
 
     # Final portfolio distribution (at each person's retirement year)
     yr_you    = max(ret_you - age_you, 0)
@@ -387,6 +417,7 @@ def run_accumulation_mc(
         "acct_labels":      [a["label"] for a in all_accounts],
         "acct_types":       [a["account_type"] for a in all_accounts],
         "salary_p50":       np.percentile(total_sal_paths, 50, axis=0),
+        "person_sal_p50":   person_sal_p50,
         "fers_salary_p50":  fers_sal_p50,
         "inf_factors":      inf_factors,
         "years":            np.arange(n_years + 1),

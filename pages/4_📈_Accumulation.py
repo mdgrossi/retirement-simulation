@@ -177,22 +177,38 @@ st.caption(
 
 # Salary chart
 st.markdown("### Salary Trajectory (Median)")
+PERSON_COLORS = ["#f0883e", "#bc8cff"]
 fig3 = go.Figure()
-sal_real = result["salary_p50"] / result["inf_factors"]
-fig3.add_trace(go.Scatter(
-    x=ages[:len(result["salary_p50"])], y=result["salary_p50"],
-    name="Combined Household (nominal)", line=dict(color="#f0883e", width=2)))
-fig3.add_trace(go.Scatter(
-    x=ages[:len(sal_real)], y=sal_real,
-    name="Combined Household (today's $)", line=dict(color="#f0883e", width=2, dash="dash")))
+
+person_sal_p50 = result.get("person_sal_p50", [])
+for pi, person in enumerate(persons):
+    if pi >= len(person_sal_p50): break
+    color = PERSON_COLORS[pi % len(PERSON_COLORS)]
+    name  = person.get("name", f"Person {pi+1}")
+    sal_labels = ", ".join(s["label"] for s in person.get("salaries", []))
+    fig3.add_trace(go.Scatter(
+        x=ages[:len(person_sal_p50[pi])], y=person_sal_p50[pi],
+        name=f"{name}: all income ({sal_labels})",
+        line=dict(color=color, width=2)))
 
 fers_person = next((p for p in persons if p.get("has_fers")), None)
-if fers_person and "fers_salary_p50" in result and result["fers_salary_p50"] is not None:
+if fers_person and result.get("fers_salary_p50") is not None:
+    fers_sals  = [s for s in fers_person.get("salaries", [])
+                  if s.get("is_fers_basic_pay", False)]
+    none_marked = not fers_sals
+    if none_marked:
+        # fallback — all used, show warning
+        fers_sals = fers_person.get("salaries", [])
+        st.warning("⚠️ No salary is marked as FERS basic pay — all of "
+                   f"{fers_person['name']}'s salaries are included in the pension high-3. "
+                   "Fix this on **Household Setup** by enabling the FERS basic pay toggle "
+                   "on only the federal salary.")
+    fers_label = ", ".join(s["label"] for s in fers_sals) or "all salaries"
     fig3.add_trace(go.Scatter(
         x=ages[:len(result["fers_salary_p50"])],
         y=result["fers_salary_p50"],
-        name=f"{fers_person['name']} only — pension high-3 source (nominal)",
-        line=dict(color="#00d4aa", width=2, dash="dot")))
+        name=f"Pension high-3 source: {fers_label}",
+        line=dict(color="#00d4aa", width=2.5, dash="dot")))
 
 fig3.update_layout(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -203,12 +219,11 @@ fig3.update_layout(
 _add_crosshair(fig3)
 st.plotly_chart(fig3, width='stretch')
 st.caption(
-    "**Orange (solid):** Combined household salary in future (nominal) dollars, growing with "
-    "your raise rate assumption plus random noise. Used to scale contributions each year. "
-    "**Orange (dashed):** Same salary in today's purchasing power — notice real salary growth "
-    "is slower than nominal because inflation erodes some of the raise. "
-    "**Teal (dotted):** The FERS person's individual salary only. "
-    "This is the exact trajectory used to compute the pension **high-3** — "
-    "the average of the final 3 years of this line before retirement.")
+    "Each solid line shows one person's total income (all salary sources combined). "
+    "**Teal dotted line:** only the income sources marked as FERS basic federal pay on the "
+    "Household Setup page — this is the exact trajectory used to compute the pension high-3. "
+    "If the teal line overlaps a solid line, all that person's salaries are feeding the "
+    "pension calculation — go to Household Setup and uncheck any non-federal income sources."
+)
 
 st.session_state["_final_portfolio_sims"] = result["final_portfolio_sims"]

@@ -128,7 +128,9 @@ def render_person(pi: int):
 
     salaries = person.setdefault("salaries", [])
     for si, sal in enumerate(salaries):
-        sc1, sc2, sc3, sc4, sc5 = st.columns([3, 2, 1.5, 1.5, 0.6])
+        # Stable key: use salary index (salaries rarely reorder, and no delete-shift problem
+        # since salary indices are managed separately from accounts)
+        sc1, sc2, sc3, sc4, sc5, sc6 = st.columns([2.5, 1.8, 1.3, 1.3, 1.3, 0.6])
         sal["label"] = sc1.text_input(
             "Label", sal["label"], key=f"sl_{pi}_{si}",
             help="A short description of this income source, e.g. 'GS-13 Step 5' or 'Side income'.")
@@ -137,15 +139,20 @@ def render_person(pi: int):
             help="Gross annual salary before taxes. Used for contribution scaling and pension high-3.")
         sal["raise_rate"] = sc3.number_input(
             "Raise %", 0.0, 10.0, float(sal["raise_rate"]), 0.1, key=f"sr_{pi}_{si}",
-            help="Expected average annual pay raise. Federal GS employees typically see "
-                 "2–4% (locality + step increases). Use your honest long-run expectation.")
+            help="Expected average annual pay raise.")
         sal["raise_noise"] = sc4.number_input(
             "Noise σ%", 0.0, 0.99, float(sal["raise_noise"]), 0.05, key=f"sn_{pi}_{si}",
-            help="Year-to-year randomness in your raise rate, expressed as a standard deviation. "
-                 "Kept below 1% per design. A value of 0.4 means most years your raise lands "
-                 "within ±0.4% of your stated rate.")
-        sc5.markdown("<br>", unsafe_allow_html=True)
-        if len(salaries) > 1 and sc5.button("🗑️", key=f"ds_{pi}_{si}",
+            help="Std dev of random annual raise variation (<1%).")
+        if person.get("has_fers"):
+            sal["is_fers_basic_pay"] = sc5.toggle(
+                "FERS basic pay", sal.get("is_fers_basic_pay", si == 0),
+                key=f"sfp_{pi}_{si}",
+                help="Only salaries marked here count toward your FERS high-3 pension calculation. "
+                     "Non-federal income (consulting, part-time, etc.) should NOT be checked.")
+        else:
+            sal["is_fers_basic_pay"] = False
+        sc6.markdown("<br>", unsafe_allow_html=True)
+        if len(salaries) > 1 and sc6.button("🗑️", key=f"ds_{pi}_{si}",
                                               help="Remove this salary row."):
             salaries.pop(si); st.rerun()
 
@@ -163,45 +170,46 @@ def render_person(pi: int):
                 "Roth vs Traditional analysis.</div>", unsafe_allow_html=True)
 
     accounts = person.setdefault("accounts", [])
-    for ai, acct in enumerate(accounts):
+    for acct in accounts:
+        # Assign a stable uid if missing (handles imported profiles and old data)
+        if "uid" not in acct:
+            import uuid
+            acct["uid"] = str(uuid.uuid4())[:8]
+        uid = acct["uid"]  # stable across deletions and reorders
+
         atype = acct.get("account_type", "ira_roth")
         label = ACCOUNT_TYPES.get(atype, atype)
         with st.expander(f"🏦 **{acct['label']}** — {label}", expanded=False):
             r1, r2 = st.columns([3, 1])
             acct["label"] = r1.text_input(
-                "Account Name", acct["label"], key=f"al_{pi}_{ai}",
+                "Account Name", acct["label"], key=f"al_{uid}",
                 help="A nickname for this account, e.g. 'TSP C Fund' or 'Vanguard Roth IRA'.")
             types = list(ACCOUNT_TYPES.keys())
             cur   = types.index(atype) if atype in types else 0
             acct["account_type"] = r2.selectbox(
                 "Type", types, cur, format_func=lambda k: ACCOUNT_TYPES[k],
-                key=f"at_{pi}_{ai}",
-                help="Account type determines tax treatment: Roth accounts grow and withdraw "
-                     "tax-free; Traditional accounts are taxed on withdrawal; HSAs are triple "
-                     "tax-advantaged for medical expenses; Brokerage accounts are taxed on gains.")
+                key=f"at_{uid}",
+                help="Account type determines tax treatment.")
 
             b1, b2, b3 = st.columns(3)
             acct["balance"] = b1.number_input(
-                "Balance ($)", 0, 10_000_000, int(acct["balance"]), 100, key=f"ab_{pi}_{ai}",
-                help="Current account balance today. This is your starting point for the "
-                     "Monte Carlo accumulation projection.")
+                "Balance ($)", 0, 10_000_000, int(acct["balance"]), 100, key=f"ab_{uid}",
+                help="Current account balance today.")
             acct["annual_contribution"] = b2.number_input(
                 "Your Contribution ($/yr)", 0, 200_000,
-                int(acct.get("annual_contribution", 0)), 100, key=f"ac_{pi}_{ai}",
-                help="The amount you personally contribute each year. For TSP, the 2024 "
-                     "limit is $23,000 ($30,500 if age 50+). For IRAs, $7,000 ($8,000 if 50+). "
+                int(acct.get("annual_contribution", 0)), 100, key=f"ac_{uid}",
+                help="The amount you personally contribute each year. For TSP, the 2026 "
+                     "limit is $24,500 ($32,500 if age 50–59 or 64+; $35,750 if age 60–63). "
+                     "For IRAs, $7,500 ($8,600 if 50+). For HSA, $4,400 individual / $8,750 family. "
                      "Contributions scale proportionally as your salary grows in the simulation.")
 
-            # Employer contribution field varies by account type
             if acct["account_type"] in EMPLOYER_MATCH_TYPES:
                 acct["employer_match_pct"] = b3.slider(
                     "Employer Match (% of salary)", 0.0, 5.0,
                     float(acct.get("employer_match_pct", 0.0)), 0.25,
-                    key=f"em_{pi}_{ai}",
+                    key=f"em_{uid}",
                     help="Your employer's matching contribution as a percentage of your salary. "
-                         "FERS employees receive an automatic 1% agency contribution plus a match "
-                         "of up to 4% (for 5% total on the first 5% contributed). "
-                         "This scales automatically as your salary grows in the simulation.")
+                         "Scales automatically as salary grows.")
                 sal_total = sum(s.get("amount", 0) for s in person.get("salaries", []))
                 est_match = sal_total * acct["employer_match_pct"] / 100
                 b3.caption(f"≈ {fmt(est_match)}/yr at current salary")
@@ -209,56 +217,49 @@ def render_person(pi: int):
                 acct["employer_contrib_flat"] = b3.number_input(
                     "Employer Pass-Through ($/yr)", 0, 10_000,
                     int(acct.get("employer_contrib_flat", 0)), 100,
-                    key=f"hsa_emp_{pi}_{ai}",
-                    help="A fixed annual dollar amount your employer deposits into your HSA — "
-                         "common with high-deductible health plans. Unlike the TSP match, this "
-                         "is not salary-linked and stays flat each year.")
+                    key=f"hsa_emp_{uid}",
+                    help="Fixed annual employer HSA contribution. Not salary-linked.")
             else:
                 acct["employer_match_pct"] = 0.0
 
-            # Allocation
             if acct["account_type"] in {"money_market", "savings"}:
                 acct["allocation"] = {"stocks": 0.0, "bonds": 0.0, "cash": 1.0}
-                st.info("💵 Money market and savings accounts earn the **Cash Return** rate "
-                        "set on the Assumptions page. No stock or bond exposure.")
+                st.info("💵 Earns the Cash Return rate set on the Assumptions page.")
             else:
                 st.markdown("**Asset Allocation**")
-                st.caption("How this account's balance is invested. Stocks drive long-run growth "
-                           "but add volatility; bonds smooth returns; cash earns a stable low rate. "
-                           "Must sum to 100%.")
                 alloc = acct.setdefault("allocation",
                                         {"stocks": 0.70, "bonds": 0.20, "cash": 0.10})
                 a1, a2, a3 = st.columns(3)
                 alloc["stocks"] = a1.slider(
                     "Stocks %", 0, 100, int(alloc.get("stocks", 0.70) * 100),
-                    key=f"as_{pi}_{ai}",
-                    help="Percentage in equities (e.g., TSP C/S/I funds, stock index funds). "
-                         "Higher allocation = more growth potential and more volatility.") / 100
+                    key=f"as_{uid}",
+                    help="Percentage in equities.") / 100
                 alloc["bonds"] = a2.slider(
                     "Bonds %", 0, 100, int(alloc.get("bonds", 0.20) * 100),
-                    key=f"ab2_{pi}_{ai}",
-                    help="Percentage in fixed income (e.g., TSP F fund, bond index funds). "
-                         "Provides stability and tends to rise when stocks fall.") / 100
+                    key=f"ab2_{uid}",
+                    help="Percentage in fixed income.") / 100
                 alloc["cash"] = a3.slider(
                     "Cash %", 0, 100, int(alloc.get("cash", 0.10) * 100),
-                    key=f"ac2_{pi}_{ai}",
-                    help="Percentage in stable value / money market (e.g., TSP G fund). "
-                         "Earns a low but guaranteed rate with no volatility.") / 100
+                    key=f"ac2_{uid}",
+                    help="Percentage in stable value / money market.") / 100
                 total = alloc["stocks"] + alloc["bonds"] + alloc["cash"]
                 if abs(total - 1.0) > 0.02:
                     st.warning(f"⚠️ Allocation sums to {total*100:.0f}% — adjust to reach 100%.")
 
-            if st.button("🗑️ Remove Account", key=f"da_{pi}_{ai}",
+            if st.button("🗑️ Remove Account", key=f"da_{uid}",
                           help="Permanently remove this account from the projection."):
-                accounts.pop(ai); st.rerun()
+                accounts.remove(acct); st.rerun()
 
     new_type = st.selectbox(
         f"Account type to add ({person['name']})", list(ACCOUNT_TYPES.keys()),
         format_func=lambda k: ACCOUNT_TYPES[k], key=f"nt_{pi}",
         help="Select the type of account you want to add, then click the button below.")
     if st.button(f"➕ Add Account", key=f"aa_{pi}"):
+        import uuid
         accounts.append({
-            "label": ACCOUNT_TYPES[new_type], "account_type": new_type,
+            "label": ACCOUNT_TYPES[new_type],
+            "uid": str(uuid.uuid4())[:8],
+            "account_type": new_type,
             "balance": 0, "annual_contribution": 0, "employer_match_pct": 0.0,
             "allocation": {"stocks": 0.0, "bonds": 0.0, "cash": 1.0}
                          if new_type in {"money_market", "savings"}

@@ -57,8 +57,8 @@ total_sal_now = sum(
 st.markdown("<div class='sh'>Current Tax Snapshot (Working Years)</div>",
             unsafe_allow_html=True)
 st.markdown("<div class='tip'>"
-            "Estimated federal income tax using 2024 Married Filing Jointly brackets and the "
-            "standard deduction. State taxes are not modeled. This snapshot helps you "
+            "Estimated federal income tax using 2026 Married Filing Jointly brackets and the "
+            "standard deduction ($32,200). State taxes are not modeled. This snapshot helps you "
             "understand your current tax position, which is the baseline for Roth vs "
             "Traditional decisions.</div>", unsafe_allow_html=True)
 
@@ -104,7 +104,7 @@ st.markdown("<div class='tip'>"
 
 rc1, rc2 = st.columns(2)
 tax = st.session_state.setdefault("tax_settings", {
-    "roth_contrib":    7_000,
+    "roth_contrib":    7_500,
     "exp_ret_income":  int(st.session_state.get("_guaranteed_income", {}).get("total", 80_000)),
 })
 
@@ -113,8 +113,8 @@ roth_contrib = rc1.number_input(
     int(tax.get("roth_contrib", 7_000)), 100,
     key="tax_roth_contrib",
     help="The dollar amount you are deciding between Roth and Traditional. "
-         "For IRAs the 2024 limit is $7,000 ($8,000 if age 50+); "
-         "for TSP up to $23,000 ($30,500 if 50+). "
+         "For IRAs the 2026 limit is $7,500 ($8,600 if age 50+); "
+         "for TSP/401k/403b up to $24,500 ($32,500 if 50–59/64+; $35,750 if age 60–63). "
          "The analysis shows which approach leaves you with more after-tax wealth "
          "at retirement for this contribution amount.")
 tax["roth_contrib"] = roth_contrib
@@ -326,16 +326,17 @@ st.markdown("<div class='tip'>"
             "IRMAA (Income-Related Monthly Adjustment Amount) adds a surcharge to Medicare "
             "Part B and Part D premiums when your Modified Adjusted Gross Income exceeds "
             "thresholds. It uses a <b>2-year lookback</b> — your 2024 income determines your "
-            "2026 premium. Plan Roth conversions and large Traditional withdrawals with this "
-            "in mind. Thresholds shown are 2024 MFJ values.</div>", unsafe_allow_html=True)
+            "2026 premiums. Standard Part B premium in 2026 is $202.90/mo. "
+            "Thresholds and surcharges below are 2026 MFJ values (source: CMS/IRS)."
+            "</div>", unsafe_allow_html=True)
 
 IRMAA_MFJ = [
-    (206_000, "$0",              "Standard premium"),
-    (258_000, "+$69.90/mo/person",  "Tier 1"),
-    (322_000, "+$174.70/mo/person", "Tier 2"),
-    (386_000, "+$279.50/mo/person", "Tier 3"),
-    (750_000, "+$384.30/mo/person", "Tier 4"),
-    (float("inf"), "+$419.30/mo/person", "Tier 5 (highest)"),
+    (218_000, "$0",                    "Standard premium"),
+    (274_000, "+$81.20/mo per person", "Tier 1"),
+    (342_000, "+$202.30/mo per person","Tier 2"),
+    (410_000, "+$323.30/mo per person","Tier 3"),
+    (750_000, "+$444.30/mo per person","Tier 4"),
+    (float("inf"), "+$487.00/mo per person", "Tier 5 (highest)"),
 ]
 
 irmaa_rows = []
