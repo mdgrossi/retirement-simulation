@@ -97,15 +97,20 @@ pcts    = result["pct_real"] if use_real else result["pct_nom"]
 yr_at_retire = max(ret_age - age_you, 0)
 yr_idx       = min(yr_at_retire, n_years)
 
+# Confidence level — which percentile is the headline planning number
+cl       = assumptions.get("confidence_level", "p50")
+cl_label = {"p50": "Median (P50)", "p25": "P25 — 75% confidence", "p10": "P10 — 90% confidence"}[cl]
+cl_pct   = {"p50": "50%", "p25": "75%", "p10": "90%"}[cl]
+
 # KPIs
 k1, k2, k3, k4 = st.columns(4)
 suffix = " (today's $)" if use_real else ""
 k1.markdown(f"""<div class='card'>
-    <div class='kpi-label'>Portfolio at Retirement (Median){suffix}</div>
-    <div class='kpi'>{fmt_m(pcts['p50'][yr_idx])}</div>
+    <div class='kpi-label'>Portfolio at Retirement ({cl_label}){suffix}</div>
+    <div class='kpi'>{fmt_m(pcts[cl][yr_idx])}</div>
     <div style='color:#8b949e;font-size:.82rem;'>
-        P10: {fmt_m(pcts['p10'][yr_idx])} · P90: {fmt_m(pcts['p90'][yr_idx])}<br>
-        80% of simulations land in this range</div>
+        Your portfolio meets or exceeds this in {cl_pct} of simulations<br>
+        P10: {fmt_m(pcts['p10'][yr_idx])} · P50: {fmt_m(pcts['p50'][yr_idx])} · P90: {fmt_m(pcts['p90'][yr_idx])}</div>
 </div>""", unsafe_allow_html=True)
 
 total_now = sum(a["balance"] for p in persons for a in p.get("accounts", []))
@@ -138,10 +143,20 @@ st.markdown("")
 # Fan chart
 fig = fan_chart(
     x=ages, pcts=pcts,
-    title="Portfolio Growth to Retirement" + ("  (Today's Dollars)" if use_real else ""),
+    title="Portfolio Growth to Retirement" + (" (Today's Dollars)" if use_real else ""),
     color="#00d4aa", x_label="Your Age", y_label="Portfolio Value", x_is_age=True)
 fig.add_vline(x=ret_age, line_dash="dash", line_color="#8b949e",
               annotation_text=f"Retire age {ret_age}", annotation_font_color="#8b949e")
+
+# Add confidence level line if not median (already shown)
+if cl != "p50":
+    fig.add_trace(go.Scatter(
+        x=ages, y=pcts[cl],
+        name=cl_label,
+        line=dict(color="#f0883e", width=2, dash="dash"),
+        hovertemplate=f"<b>Age %{{x}}</b><br>{cl_label}: %{{customdata}}<extra></extra>",
+        customdata=[fmt_m(v) for v in pcts[cl]],
+    ))
 
 
 if show_spaghetti:
@@ -163,7 +178,7 @@ st.caption(
     "The dashed vertical line marks your target retirement age. "
     "Wide bands = high uncertainty; narrow bands = more predictable trajectory.")
 
-# Stacked area
+# Account breakdown chart
 st.markdown("### Account Breakdown (Median)")
 fig2 = stacked_account_area(result["acct_medians"], ages, use_real=use_real)
 fig2.add_vline(x=ret_age, line_dash="dash", line_color="#8b949e")

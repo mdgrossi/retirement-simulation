@@ -31,6 +31,7 @@ a = st.session_state.setdefault("assumptions", {
     "inflation_rate": 3.0, "n_simulations": 1000,
     "show_real_dollars": False,
     "retirement_age_you": 62, "retirement_age_spouse": 60,
+    "confidence_level": "p50",
 })
 persons = st.session_state.get("persons", [{}, {}])
 
@@ -135,13 +136,13 @@ ic1, ic2 = st.columns([2, 2])
 with ic1:
     a["inflation_rate"] = st.slider(
         "Annual Inflation Rate (%)", 1.0, 6.0, a.get("inflation_rate", 3.0), 0.25, key="inf",
-        help="The assumed long-run average inflation rate. Used to: inflate spending targets "
+        help="The assumed long-run average inflation rate. Used to inflate spending targets "
              "each year, deflate projections into today's dollars, calculate FERS COLA, "
              "and adjust tax brackets. The Fed targets 2%; long-run US average is ~3%. "
              "Using 3–3.5% is a reasonable conservative assumption.")
 with ic2:
     a["show_real_dollars"] = st.toggle(
-        "Show inflation-adjusted (today's $) on charts by default",
+        "Show inflation-adjusted (today's dollar) on charts by default",
         a.get("show_real_dollars", False), key="real_toggle",
         help="When on, all portfolio value charts are divided by the cumulative inflation "
              "factor to show purchasing power in today's dollars rather than future nominal "
@@ -174,6 +175,43 @@ with sc2:
                 "75th, 90th, and 95th percentile outcomes. The wider the fan, the more "
                 "uncertainty in the projection.</div>", unsafe_allow_html=True)
 
+# ── Planning Confidence Level ─────────────────────────────────────────────────
+st.markdown("<div class='sh'>Planning Confidence Level</div>", unsafe_allow_html=True)
+st.markdown("<div class='tip'>"
+            "Controls which percentile is used as the <b>headline planning number</b> on "
+            "the Accumulation and Scenarios pages. A higher confidence level means you are "
+            "planning against a worse market scenario — your portfolio must be large enough "
+            "to succeed even in that scenario. Fidelity defaults to 90% (significantly below "
+            "average markets). The fan charts always show all percentile bands regardless of "
+            "this setting.</div>", unsafe_allow_html=True)
+
+CL_OPTIONS = {
+    "p50": "50% — Median (average market conditions)",
+    "p25": "75% — Conservative (below average markets)",
+    "p10": "90% — Very Conservative (significantly below average, like Fidelity)",
+}
+cl_keys   = list(CL_OPTIONS.keys())
+cl_labels = list(CL_OPTIONS.values())
+cur_cl    = a.get("confidence_level", "p50")
+cur_idx   = cl_keys.index(cur_cl) if cur_cl in cl_keys else 0
+
+chosen_cl = st.radio(
+    "Headline confidence level", cl_labels, index=cur_idx,
+    key="conf_level",
+    help="This changes which percentile line is shown as your 'expected' portfolio value "
+         "in KPI cards and the savings optimizer. It does not change the fan chart bands.")
+a["confidence_level"] = cl_keys[cl_labels.index(chosen_cl)]
+
+cl_desc = {
+    "p50": "In 50% of simulations, your portfolio will be **at or above** this value. "
+           "This is the median — an optimistic planning number.",
+    "p25": "In 75% of simulations, your portfolio will be **at or above** this value. "
+           "Markets underperform average 25% of the time historically.",
+    "p10": "In 90% of simulations, your portfolio will be **at or above** this value. "
+           "This is Fidelity's default — conservative planning against bad market sequences.",
+}
+st.caption(cl_desc[a["confidence_level"]])
+
 # ── Return distribution preview ────────────────────────────────────────────────
 st.markdown("<div class='sh'>Return Distribution Preview</div>", unsafe_allow_html=True)
 
@@ -191,7 +229,7 @@ fig = go.Figure()
 fig.add_trace(go.Histogram(
     x=port * 100, nbinsx=80,
     marker_color="rgba(0,212,170,0.6)",
-    marker_line_color="#00d4aa", marker_line_width=0.5))
+    marker_line_color="#00d4aa", marker_line_width=0.25))
 fig.add_vline(x=p50*100,  line_color="#e6edf3", line_dash="dash",
               annotation_text=f"Median: {p50*100:.1f}%",
               annotation_font_color="#e6edf3")
@@ -216,5 +254,5 @@ st.caption(
     f"**White dashed line (median):** the most likely outcome ({p50*100:.1f}%). "
     f"**Red dotted line (P5):** a bad year ({p5*100:.1f}%). "
     f"The spread of this histogram drives the width of the fan charts on later pages — "
-    f"higher volatility = wider fan = more uncertainty."
+    f"higher volatility leads to wider fan, which means more uncertainty."
 )
