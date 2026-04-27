@@ -713,6 +713,21 @@ def calculate_scenario_spending(
         "deplete_gap": deplete_gap,
     }
 
+def savings_reduction_possible(
+    portfolio_surplus: float,
+    years_to_retire:   int,
+    real_return:       float,
+) -> float:
+    """
+    If the projected portfolio exceeds what's needed, how much less per year
+    could you save and still hit the target?  Inverse of FV-of-annuity formula.
+    """
+    if portfolio_surplus <= 0 or years_to_retire <= 0:
+        return 0.0
+    r = max(real_return, 0.0001)
+    fv_factor = ((1 + r) ** years_to_retire - 1) / r
+    return portfolio_surplus / fv_factor
+
 def additional_contribution_needed(
     portfolio_target:   float,
     portfolio_p50_now:  float,   # current median projected portfolio

@@ -6,7 +6,7 @@ import sys, os, hashlib, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.calculations import (run_accumulation_mc, run_distribution_mc,
                                  estimate_needed_portfolio, additional_contribution_needed,
-                                 calculate_scenario_spending)
+                                 calculate_scenario_spending, savings_reduction_possible)
 from utils.charts import fan_chart, multi_scenario_fan, income_waterfall, prob_gauge, SCENARIO_COLORS
 import plotly.graph_objects as go
 
@@ -23,10 +23,10 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .divider{border-top:1px solid #21262d;margin:8px 0;}
 </style>""", unsafe_allow_html=True)
 
-def fmt(v):   return f"\${v:,.0f}"
+def fmt(v):   return f"${v:,.0f}"
 def fmt_m(v):
-    if abs(v) >= 1e6: return f"\${v/1e6:.2f}M"
-    if abs(v) >= 1e3: return f"\${v/1e3:,.0f}K"
+    if abs(v) >= 1e6: return f"${v/1e6:.2f}M"
+    if abs(v) >= 1e3: return f"${v/1e3:,.0f}K"
     return fmt(v)
 def hfmt(v):  return f"&#36;{v:,.0f}"
 def hfmt_m(v):
@@ -136,7 +136,7 @@ st.markdown("<div class='tip'>"
             "• <b style='color:#79c0ff;'>Sustain:</b> Spending ≈ portfolio returns. Real balance stays "
             "flat indefinitely — equivalent to the '4% rule' portfolio at 4% real return.<br>"
             "• <b style='color:#f0883e;'>Deplete:</b> Spend more than returns. Portfolio drawn toward "
-            "the reserve floor by life expectancy. Maximizes spending; requires the least upfront capital."
+            "the reserve floor by life expectancy. Maximises spending; requires the least upfront capital."
             "</div>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ gc1.metric("FERS Pension",             fmt(gi.get("pension",    0)) + "/yr",
 gc2.metric("FERS Supplement (pre-62)", fmt(gi.get("supplement", 0)) + "/yr",
             help="Paid until age 62. Zero for deferred retirees or those retiring at 62+.")
 gc3.metric("Social Security",          fmt(gi.get("ss", 0))       + "/yr",
-            help="Combined Social Security for both partners. Zero if excluded via the toggle.")
+            help="Combined SS for both partners. Zero if excluded via the toggle.")
 gc4.metric("Total Guaranteed Floor",   fmt(gtot_floor)            + "/yr",
             help="The gap between this and your spending target is what your portfolio must cover.")
 
@@ -191,7 +191,7 @@ scenarios["reserve_amount"] = sc4.number_input(
     "🔒 Reserve ($)", 0, 500_000, int(scenarios.get("reserve_amount", 75_000)), 100,
     key="res_amt",
     help="Minimum balance to maintain even in the Deplete scenario. A safety buffer against "
-         "living longer than expected or unexpected expenses. Success is never breaching this floor.")
+         "living longer than expected or unexpected expenses. Success = never breaching this floor.")
 
 # Auto-calculate button
 if cur_proj > 0:
@@ -208,11 +208,11 @@ if cur_proj > 0:
                    f"a real return of {real_ret*100:.1f}%, and a {yrs_dist}-year horizon.")
         ac1, ac2, ac3 = st.columns(3)
         ac1.metric("🌱 Grow", fmt(suggested["grow_spending"]) + "/yr",
-                    help="Portfolio grows 1% per year in real terms")
+                    help="Portfolio grows 1%/yr in real terms")
         ac2.metric("⚖️ Sustain", fmt(suggested["sustain_spending"]) + "/yr",
                     help="Balance stays flat in real terms — perpetuity formula")
         ac3.metric("📉 Deplete", fmt(suggested["deplete_spending"]) + "/yr",
-                    help="Present value annuity that exhausts portfolio to reserve by life expectancy")
+                    help="PV annuity that exhausts portfolio to reserve by life expectancy")
         if st.button("↩ Apply these targets to the inputs above"):
             scenarios["grow_spending"]    = int(suggested["grow_spending"])
             scenarios["sustain_spending"] = int(suggested["sustain_spending"])
@@ -226,12 +226,12 @@ st.markdown("<div class='sh'>Step 3 — Run the Simulation</div>", unsafe_allow_
 disp1, disp2, disp3 = st.columns([1, 2, 1])
 use_real = disp1.toggle(
     "Show Today's Dollars", assumptions.get("show_real_dollars", False), key="sc_real",
-    help="Show all portfolio values in today's purchasing power.")
+    help="Show all portfolio values in today's purchasing power (inflation-adjusted).")
 mc_type = disp2.radio(
     "Chart type", ["Fan Chart (percentile bands)", "Probability of Success"],
     horizontal=True, label_visibility="collapsed",
     help="Fan chart: shows the full range of outcomes as percentile bands. "
-         "Gauge: single probability-of-success percentage per scenario.")
+         "Gauge: single probability-of-success % per scenario.")
 
 if ("scenario_fp" in st.session_state
         and st.session_state["scenario_fp"] != cur_fp
@@ -396,6 +396,163 @@ else:
             st.caption(f"{fmt(scenarios[spend_map[key]])}/yr · {fmt(scenarios[spend_map[key]]/12)}/mo")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SECTION 4.5 — FIXED-SPENDING GOAL ANALYSIS
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("<div class='sh'>Fixed Spending Target — Am I On Track?</div>",
+            unsafe_allow_html=True)
+st.markdown("<div class='tip'>"
+            "Keep your spending constant and ask: <b>what portfolio do I need to achieve this "
+            "spending level under each scenario goal, and how does my current savings rate compare?</b> "
+            "If your projected portfolio exceeds what's needed, the surplus column shows how much "
+            "you could <i>reduce</i> your annual contributions and still meet the target. "
+            "If you're short, it shows how much more you'd need to save per year."
+            "</div>", unsafe_allow_html=True)
+
+fs1, fs2 = st.columns([2, 1])
+fixed_spend = fs1.number_input(
+    "Fixed Annual Spending Target (today's $)", 20_000, 500_000,
+    int(scenarios.get("sustain_spending", 105_000)), 100,
+    key="fixed_spend",
+    help="The single spending level to analyse across all three scenario goals. "
+         "Defaults to your Sustain spending target.")
+run_fixed = st.button("▶ Run Fixed-Spending Analysis", key="run_fixed",
+                       help="Runs a single Monte Carlo at this spending level to calculate "
+                            "probability of success and compare to each scenario's required portfolio.")
+
+# Run MC at fixed spending from current projected portfolio
+if run_fixed or "fixed_spend_result" not in st.session_state:
+    if "accum_result" not in st.session_state:
+        st.info("Run **Accumulation** first."); st.stop()
+    with st.spinner("Running fixed-spending Monte Carlo…"):
+        accum_r   = st.session_state["accum_result"]
+        yr_ret    = max(ret_you - age_you, 0)
+        initial   = accum_r["portfolio_paths"][:, min(yr_ret, accum_r["n_years"])]
+        inc_fs    = build_income_sources()
+        fixed_res = run_distribution_mc(
+            initial_sims=initial, income_sources=inc_fs, assumptions=assumptions,
+            retirement_age_you=ret_you, retirement_age_spouse=ret_spouse,
+            life_exp_you=le_you, life_exp_spouse=le_spouse,
+            annual_spending=fixed_spend,
+            reserve_amount=scenarios["reserve_amount"], seed=42)
+        st.session_state["fixed_spend_result"] = fixed_res
+        st.session_state["fixed_spend_value"]  = fixed_spend
+
+fixed_res = st.session_state.get("fixed_spend_result")
+if not fixed_res:
+    st.info("Click **Run Fixed-Spending Analysis** above.")
+else:
+    fixed_spend_used = st.session_state.get("fixed_spend_value", fixed_spend)
+    fixed_gap  = max(fixed_spend_used - gtot_inc, 0)
+    prob_fixed = fixed_res["prob_success"]
+    pcts_fixed = fixed_res["pct_real"] if use_real else fixed_res["pct_nom"]
+    ages_fixed = fixed_res["ages_you"]
+
+    # Current annual contributions from all accounts
+    total_annual_contrib = sum(
+        a.get("annual_contribution", 0)
+        + sum(s.get("amount", 0) for s in p.get("salaries", [])) * a.get("employer_match_pct", 0) / 100
+        for p in persons for a in p.get("accounts", [])
+    )
+
+    # Three scenario cards side by side
+    fs_cols = st.columns(3)
+    scenario_goals = [
+        ("grow",    "🌱 Grow Goal",    "#3fb950", "Portfolio grows in real terms"),
+        ("sustain", "⚖️ Sustain Goal", "#79c0ff", "Balance stays flat — perpetuity"),
+        ("deplete", "📉 Deplete Goal", "#f0883e", "Balance drawn to reserve by LE"),
+    ]
+    for col, (mode, label, color, desc) in zip(fs_cols, scenario_goals):
+        req      = estimate_needed_portfolio(fixed_gap, yrs_dist, real_ret, mode,
+                                              reserve=scenarios["reserve_amount"])
+        surplus  = cur_proj - req
+        on_track = surplus >= 0
+        if on_track:
+            reduction = savings_reduction_possible(surplus, yrs_ret, real_ret)
+            action_label = "Could reduce savings by"
+            action_value = hfmt_m(reduction) + "/yr"
+            action_color = "#3fb950"
+            status = "✅ On track"
+        else:
+            shortfall = -surplus
+            extra     = additional_contribution_needed(req, cur_proj, yrs_ret, real_ret)
+            action_label = "Extra savings needed"
+            action_value = hfmt_m(extra) + "/yr"
+            action_color = "#f0883e"
+            status = f"⚠️ Short {hfmt_m(shortfall)}"
+
+        status_color = "#3fb950" if on_track else "#f0883e"
+        with col:
+            st.markdown(f"""<div class='card'>
+                <div class='scenario-header' style='color:{color};'>{label}</div>
+                <div style='color:#8b949e;font-size:.82rem;margin-bottom:8px;'>{desc}</div>
+                <div class='divider'></div>
+                <table style='width:100%;font-size:.88rem;margin:8px 0;'>
+                <tr><td style='color:#8b949e;'>Required portfolio</td>
+                    <td style='text-align:right;font-weight:700;'>{hfmt_m(req)}</td></tr>
+                <tr><td style='color:#8b949e;'>Projected ({cl_label})</td>
+                    <td style='text-align:right;'>{hfmt_m(cur_proj)}</td></tr>
+                <tr><td style='color:#8b949e;'>{action_label}</td>
+                    <td style='text-align:right;font-weight:700;color:{action_color};'>{action_value}</td></tr>
+                </table>
+                <div class='divider'></div>
+                <div style='margin-top:8px;font-size:.82rem;font-weight:600;
+                    color:{status_color};'>{status}</div>
+            </div>""", unsafe_allow_html=True)
+
+    # Probability of success gauge + explanation
+    st.markdown(f"**Probability of success at {fmt(fixed_spend_used)}/yr spending "
+                f"({fmt(fixed_spend_used/12)}/mo)** — starting from your current projected portfolio:")
+    g1, g2 = st.columns([1, 2])
+    with g1:
+        p_color = "#3fb950" if prob_fixed >= 80 else "#f0883e" if prob_fixed >= 60 else "#f85149"
+        st.plotly_chart(prob_gauge(prob_fixed, "Success probability", p_color), width='stretch')
+    with g2:
+        st.markdown(f"""
+Your current projected portfolio ({cl_label}: **{fmt_m(cur_proj)}**) has a
+**{prob_fixed:.1f}% probability of success** at **{fmt(fixed_spend_used)}/yr** spending —
+meaning in {prob_fixed:.0f}% of simulations, your portfolio never falls below the
+**{fmt(scenarios['reserve_amount'])}** reserve floor throughout both lifetimes.
+
+| Range | Interpretation |
+|---|---|
+| ≥ 90% | Very high confidence — you may be over-saving |
+| 80–90% | Strong plan — typical advisor target |
+| 70–80% | Acceptable with flexible spending in bad markets |
+| < 70% | Consider saving more or reducing spending |
+""")
+
+    # Single overlay fan chart with all three required levels as reference lines
+    st.markdown(f"**Portfolio trajectory at {fmt(fixed_spend_used)}/yr** — "
+                "dashed lines mark the portfolio required for each scenario goal:")
+    fig_fs = fan_chart(pcts=pcts_fixed, x=ages_fixed,
+                        title=f"Portfolio at Fixed Spending: {fmt(fixed_spend_used)}/yr",
+                        color="#00d4aa", x_label="Your Age",
+                        y_label="Portfolio Value", x_is_age=True)
+
+    for mode, lbl, clr, _ in scenario_goals:
+        req_line = estimate_needed_portfolio(fixed_gap, yrs_dist, real_ret, mode,
+                                              reserve=scenarios["reserve_amount"])
+        fig_fs.add_hline(
+            y=req_line, line_dash="dash", line_color=clr, line_width=1.5,
+            annotation_text=f"{lbl}: {fmt_m(req_line)}",
+            annotation_font_color=clr, annotation_position="right")
+
+    fig_fs.add_hline(
+        y=scenarios["reserve_amount"],
+        line_dash="dot", line_color="#f85149", line_width=1,
+        annotation_text="Reserve floor", annotation_font_color="#f85149",
+        annotation_position="right")
+
+    st.plotly_chart(fig_fs, width='stretch')
+    st.caption(
+        "Teal fan: your portfolio trajectory at the fixed spending level (P10–P90 bands, median solid). "
+        "Dashed horizontal lines mark the portfolio size required for each scenario goal. "
+        "If your median (solid teal) stays **above** a line, you meet that goal in the median case. "
+        "The fan bands show the range of uncertainty — a wider fan means more market risk. "
+        "Red dotted: reserve floor."
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SECTION 5 — INCOME BREAKDOWN
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("<div class='sh'>Income Sources — Sustain Scenario</div>", unsafe_allow_html=True)
@@ -422,9 +579,9 @@ At the Sustain level: {fmt(scenarios.get('sustain_spending', 105_000))} − {fmt
 
 | Scenario | Formula | Concept |
 |---|---|---|
-| 🌱 Grow | `Gap ÷ (return − 1%)` | Portfolio grows 1% per year in real terms |
-| ⚖️ Sustain | `Gap ÷ return` | Perpetuity — balance never changes |
-| 📉 Deplete | Present Value of {yrs_dist}-year annuity + Present Value of reserve | Principal spent down to reserve |
+| 🌱 Grow | `Gap ÷ (real_r − 1%)` | Portfolio grows 1%/yr in real terms |
+| ⚖️ Sustain | `Gap ÷ real_r` | Perpetuity — balance never changes |
+| 📉 Deplete | PV of {yrs_dist}-yr annuity + PV of reserve | Principal spent down to reserve |
 
 **The 4% rule** (`Portfolio = Income ÷ 4%`) is mathematically identical to the
 Sustain formula when real return = 4%. The Trinity Study found this portfolio size
