@@ -59,8 +59,9 @@ a["retirement_age_spouse"] = rc2.slider(
 st.markdown("<div class='sh'>Life Expectancy</div>", unsafe_allow_html=True)
 st.markdown("<div class='tip'>"
             "Spend-down projections run until the <b>later</b> of the two life expectancies. "
-            "SSA tables suggest a 65-year-old today has a 50% chance of living past 85 (men) "
-            "or 87 (women). Setting this higher (e.g., 95) is the conservative choice — "
+            "Social Security Administration (SSA) tables suggest a 65-year-old "
+            "today has a 50% chance of living past 85 (men) or 87 (women). "
+            "Setting this higher (e.g., 95) is the conservative choice — "
             "it's much better to have money left over than to run short.</div>",
             unsafe_allow_html=True)
 
@@ -99,7 +100,7 @@ with mc1:
              "Be conservative — optimistic return assumptions are the #1 cause of "
              "retirement planning failures.")
     a["stock_volatility"] = st.slider(
-        "Volatility / Std Dev (%)", 5.0, 25.0, a.get("stock_volatility", 15.0), 0.5, key="sv",
+        "Volatility / Standard Deviation (%)", 5.0, 25.0, a.get("stock_volatility", 15.0), 0.5, key="sv",
         help="How much stock returns vary year to year. Historically ~15–17% for US large-cap. "
              "Higher volatility increases sequence-of-returns risk in early retirement years. "
              "This is the standard deviation of the log-normal return distribution.")
@@ -111,7 +112,7 @@ with mc2:
              "of near-term bond returns than historical averages. The 10-year Treasury yield "
              "is a useful anchor.")
     a["bond_volatility"] = st.slider(
-        "Volatility / Std Dev (%)", 1.0, 15.0, a.get("bond_volatility", 6.0), 0.5, key="bv",
+        "Volatility / Standard Deviation (%)", 1.0, 15.0, a.get("bond_volatility", 6.0), 0.5, key="bv",
         help="Year-to-year variability in bond returns. Historically ~5–8% for intermediate "
              "bond funds. Longer-duration bonds have higher volatility.")
 with mc3:

@@ -62,7 +62,7 @@ sd = st.session_state.setdefault("spend_down", {
 })
 
 annual_spend = p1.number_input(
-    "Annual Spending Target (today's $)", 20_000, 500_000,
+    "Annual Spending Target (today's dollars)", 20_000, 500_000,
     int(sd.get("annual_spend", scenarios.get("sustain_spending", 105_000))), 100,
     key="sd_spend",
     help="Total annual household spending in today's dollars. The simulation inflates "
@@ -92,17 +92,17 @@ st.markdown("<div class='tip'>"
             "</div>", unsafe_allow_html=True)
 
 al1, al2, al3 = st.columns(3)
-ws = al1.slider("Stocks %", 0, 100, int(sd.get("alloc_stocks", 50)),
+ws = al1.slider("Stocks (%)", 0, 100, int(sd.get("alloc_stocks", 50)),
                  key="sd_stocks",
                  help="Higher stock allocation increases long-run expected returns but also "
                       "increases sequence-of-returns risk — the danger of a big drop in early "
                       "retirement permanently impairing your portfolio.") / 100
-wb = al2.slider("Bonds %",  0, 100, int(sd.get("alloc_bonds", 40)),
+wb = al2.slider("Bonds (%)",  0, 100, int(sd.get("alloc_bonds", 40)),
                  key="sd_bonds",
                  help="Bonds provide stability and tend to be negatively correlated with stocks. "
                       "A higher bond allocation reduces volatility and sequence risk, "
                       "at the cost of lower expected long-run returns.") / 100
-wc = al3.slider("Cash %",   0, 100, int(sd.get("alloc_cash", 10)),
+wc = al3.slider("Cash (%)",   0, 100, int(sd.get("alloc_cash", 10)),
                  key="sd_cash",
                  help="Cash / stable value earns a low but guaranteed return. "
                       "Holding 1–2 years of spending gap in cash is a common strategy to "
@@ -212,7 +212,7 @@ k4.markdown(f"""<div class='card'>
 
 # Fan chart
 st.markdown("<div class='sh'>Portfolio Value Through Retirement</div>", unsafe_allow_html=True)
-title = "Portfolio Spend-Down  (Today's Dollars)" if use_real else "Portfolio Spend-Down"
+title = "Portfolio Spend-Down (Today's Dollars)" if use_real else "Portfolio Spend-Down"
 fig = fan_chart(pcts=pcts, x=ages_you, title=title, color="#00d4aa",
                 x_label="Your Age", y_label="Portfolio Value", x_is_age=True)
 
@@ -289,7 +289,7 @@ fig_wf = income_waterfall(df_inc, use_real=use_real,
 st.plotly_chart(fig_wf, width='stretch')
 st.caption(
     "Each bar shows where your income comes from in that year. "
-    "**Teal:** FERS pension (grows with COLA). "
+    "**Teal:** FERS pension (grows with cost of living adjustments). "
     "**Purple:** FERS Supplement (stops at age 62). "
     "**Blue/Green:** Social Security for each partner (begins at their claim age). "
     "**Amber:** Amount your portfolio must cover — any year where amber dominates "
@@ -300,7 +300,7 @@ st.caption(
 st.markdown("<div class='sh'>Survivor Analysis</div>", unsafe_allow_html=True)
 st.markdown("<div class='tip'>"
             "When one partner dies, household income changes significantly. Pension survivor "
-            "benefits, SS survivor rules, and the loss of one SS check all affect the "
+            "benefits, Social Security (SS) survivor rules, and the loss of one SS check all affect the "
             "surviving partner's income. This section shows the guaranteed income floor "
             "under each scenario — the portfolio must cover any shortfall.</div>",
             unsafe_allow_html=True)

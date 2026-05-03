@@ -261,7 +261,7 @@ def roth_vs_trad_chart(result: Dict) -> go.Figure:
     if result["crossover_year"] is not None:
         cy = result["crossover_year"]
         fig.add_vline(x=cy, line_dash="dash", line_color=MUTED,
-                      annotation_text=f"Crossover yr {cy}", annotation_font_color=MUTED)
+                      annotation_text=f"Crossover year: {cy}", annotation_font_color=MUTED)
 
     layout = dict(**BASE_LAYOUT)
     layout["title"] = dict(text="Roth vs Traditional: After-Tax Wealth at Retirement",

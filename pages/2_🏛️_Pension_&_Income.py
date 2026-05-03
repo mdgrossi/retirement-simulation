@@ -25,9 +25,10 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 def fmt(v): return f"${v:,.0f}"
 
 st.markdown("## 🏛️ Pension & Income")
-st.markdown("<p style='color:#8b949e;'>Configure your FERS pension, Social Security estimates, "
-            "and review your guaranteed income floor — the income you receive regardless of "
-            "portfolio performance.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#8b949e;'>Configure your Federal Employees "
+            "Retirement System (FERS) pension, Social Security estimates, "
+            "and review your guaranteed income floor — the income you receive "
+            "regardless of portfolio performance.</p>", unsafe_allow_html=True)
 
 persons     = st.session_state.get("persons", [])
 assumptions = st.session_state.get("assumptions", {})
@@ -42,7 +43,7 @@ else:
         st.markdown(f"<div class='sh'>FERS Pension — {person['name']}</div>",
                     unsafe_allow_html=True)
         st.markdown("<div class='tip'>"
-                    "FERS (Federal Employees Retirement System) is a defined-benefit pension. "
+                    "Federal Employees Retirement System (FERS) is a defined-benefit pension. "
                     "Your annual benefit = <b>Multiplier × High-3 Salary × Years of Service</b>. "
                     "The multiplier is 1.0% in most cases, or 1.1% if you retire at age 62+ "
                     "with 20+ years of service. The high-3 is the average of your three highest "
@@ -54,7 +55,7 @@ else:
             "Current Years of Service", 0, 50,
             fers.get("years_service_current", 10), key=f"yos_{person['name']}",
             help="Your total years of creditable federal service today. Each additional year "
-                 "of service adds directly to your pension (e.g., 1 more year at a $100K "
+                 "of service adds directly to your pension (e.g., 1 more year at a \$100K "
                  "high-3 with a 1% multiplier = $1,000/yr more pension).")
 
         ret_key = "retirement_age_you" if person == persons[0] else "retirement_age_spouse"
@@ -68,7 +69,7 @@ else:
 
         mra = get_fers_mra(person.get("birth_year", 1984))
         c3.markdown(f"""<div class='card' style='margin-top:4px;'>
-            <div class='kpi-label'>Min. Retirement Age (OPM)</div>
+            <div class='kpi-label'>Minimum Retirement Age (OPM)</div>
             <div class='kpi'>{mra}</div>
             <div style='color:#8b949e;font-size:.82rem;'>Birth year {person.get('birth_year',1984)}
             · Cannot retire with immediate pension before this age</div>
@@ -88,9 +89,9 @@ else:
             st.markdown("<div class='tip'>"
                         "📋 <b>Deferred retirement rules (OPM):</b><br>"
                         "• Minimum 5 years of creditable service to qualify.<br>"
-                        "• High-3 salary and YOS are <b>frozen at separation</b> — no further accrual.<br>"
+                        "• High-3 salary and years of service (YOS) are <b>frozen at separation</b> — no further accrual.<br>"
                         "• No FERS Supplement (only available for immediate retirees).<br>"
-                        "• No COLA until pension payments begin.<br>"
+                        "• No cost of living adjustment (COLA) until pension payments begin.<br>"
                         "• Earliest collection: age 62 with 5–9 YOS; MRA with 10+ YOS."
                         "</div>", unsafe_allow_html=True)
 
@@ -100,7 +101,7 @@ else:
                 fers.get("separation_age", person["age"] + 5),
                 key=f"sep_age_{person['name']}",
                 help="The age at which you leave federal service. Your salary projection and "
-                     "YOS accural stop here. The high-3 is computed from the 3 years prior.")
+                     "YOS accrual stop here. The high-3 is computed from the 3 years prior.")
 
             max_yos = fers["years_service_current"] + (fers["separation_age"] - person["age"])
             fers["years_service_at_sep"] = d2.number_input(
@@ -198,7 +199,7 @@ trajectory — exactly what feeds the High-3 calculation.
 
         if fers.get("deferred") and not result.get("eligible", True):
             st.warning("⚠️ These settings may not meet FERS eligibility. "
-                       "Minimum: 5 YOS + collect at 62, or 10 YOS + collect at MRA.")
+                       "Minimum: 5 YOS and collect at 62, or 10 YOS and collect at MRA.")
 
         # KPI cards
         mode_label = (f"Deferred · sep {fers.get('separation_age')} · "
@@ -235,7 +236,7 @@ trajectory — exactly what feeds the High-3 calculation.
 
         if result["has_supplement"]:
             st.info("**FERS Supplement:** Because you're retiring before age 62, you'll receive "
-                    "a supplement that approximates the Social Security benefit you've earned "
+                    "a supplement that approximates the Social Security (SS) benefit you've earned "
                     "through federal service. It is paid until you turn 62, then stops. "
                     "Configure your SS estimate below to calculate the supplement amount "
                     f"({result['supplement_fraction']*100:.0f}% × SS benefit, "
@@ -263,18 +264,20 @@ trajectory — exactly what feeds the High-3 calculation.
             title="Pension Income Through Retirement",
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#e6edf3"), xaxis_title="Your Age",
-            yaxis_title="Annual Amount", yaxis_tickformat="$,.0f",
+            yaxis_title="Annual Amount", yaxis_tickformat="\$,.0f",
             xaxis=dict(gridcolor="#21262d"), yaxis=dict(gridcolor="#21262d"),
             legend=dict(bgcolor="rgba(22,27,34,0.8)", bordercolor="#21262d", borderwidth=1))
         _add_crosshair(fig)
         st.plotly_chart(fig, width='stretch')
-        st.caption("**Teal (solid):** Your pension in future dollars, growing each year by the "
-                   "FERS COLA (CPI minus 1 point when inflation > 3%). "
-                   "**Blue (dashed):** The same pension expressed in today's purchasing power — "
-                   "note how inflation slowly erodes real value even with COLA. "
-                   "**Orange (dotted):** What your survivor receives after your death, "
-                   "also COLA-adjusted. The gap between teal and orange is the cost of "
-                   "the survivor benefit election.")
+        st.caption("**Teal (solid):** Your pension in future dollars, growing "
+                   "each year by the FERS cost of living adjustment (COLA) "
+                   "(consumer price index (CPI) minus 1 point when inflation "
+                   "> 3%). **Blue (dashed):** The same pension expressed in "
+                   "today's purchasing power — note how inflation slowly "
+                   "erodes real value even with COLA. **Orange (dotted):** "
+                   "What your survivor receives after your death, also "
+                   "COLA-adjusted. The gap between teal and orange is the cost "
+                   "of the survivor benefit election.")
 
 # ── Social Security ────────────────────────────────────────────────────────────
 st.markdown("<div class='sh'>Social Security</div>", unsafe_allow_html=True)
@@ -287,9 +290,9 @@ st.markdown("<div class='tip'>"
 
 col_ss_tog, _ = st.columns([2, 3])
 include_ss = col_ss_tog.toggle(
-    "Include SS in retirement income planning",
+    "Include Social Security in retirement income planning",
     value=st.session_state.get("include_ss", True),
-    help="Toggle off to model retirement without Social Security — useful for conservative "
+    help="Toggle off to model retirement without Social Security (SS) — useful for conservative "
          "planning, or if Windfall Elimination Provision (WEP) or Government Pension Offset "
          "(GPO) significantly reduces your benefit. SS details are preserved when toggled off.")
 st.session_state["include_ss"] = include_ss
@@ -305,11 +308,11 @@ for person in persons:
     ss["monthly_fra"] = sc1.number_input(
         "Monthly Benefit at FRA ($)", 0, 10_000,
         int(ss.get("monthly_fra", 2_000)), 100, key=f"ss_fra_{person['name']}",
-        help="Your estimated monthly Social Security benefit if you claim at your Full "
+        help="Your estimated monthly Social Security (SS) benefit if you claim at your Full "
              "Retirement Age. Find this on your SSA.gov statement (ssa.gov/myaccount). "
              "As a very rough rule of thumb, SS typically replaces about 30–40% of "
-             "pre-retirement income for average earners — so someone earning $80K/yr "
-             "might expect roughly $2,000–$2,700/mo at FRA. Your SSA statement is far "
+             "pre-retirement income for average earners — so someone earning \$80K/yr "
+             "might expect roughly \$2,000–\$2,700/mo at FRA. Your SSA statement is far "
              "more accurate than any estimate.")
     ss["fra"] = sc2.number_input(
         "Full Retirement Age", 62, 70, int(ss.get("fra", 67)),
@@ -328,8 +331,8 @@ for person in persons:
     diff   = (annual / 12 - ss["monthly_fra"]) / max(ss["monthly_fra"], 1) * 100
     color  = "#3fb950" if diff >= 0 else "#f0883e"
     st.markdown(f"<span style='color:{color};font-weight:600;'>"
-                f"Adjusted benefit: ${annual/12:,.0f}/mo ({diff:+.1f}% vs FRA) "
-                f"→ ${annual:,.0f}/yr</span>", unsafe_allow_html=True)
+                f"Adjusted benefit: \${annual/12:,.0f}/mo ({diff:+.1f}% versus FRA) "
+                f"→ \${annual:,.0f}/yr</span>", unsafe_allow_html=True)
     ss["_annual_benefit"] = annual
 
     # FERS supplement — always recompute from current calc and current SS benefit
@@ -345,7 +348,7 @@ for person in persons:
             st.caption(
                 f"**FERS Supplement:** ${supp:,.0f}/yr from age "
                 f"{calc.get('retirement_age','?')} until age 62 "
-                f"({fraction*100:.0f}% × your SS estimate of ${annual:,.0f}/yr, "
+                f"({fraction*100:.0f}% × your SS estimate of \${annual:,.0f}/yr, "
                 f"based on {calc.get('total_yos', 0)} years of service). "
                 f"This supplement stops abruptly at 62 and is unaffected by your SS claim age."
             )

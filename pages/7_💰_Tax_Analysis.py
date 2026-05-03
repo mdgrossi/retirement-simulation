@@ -36,8 +36,10 @@ def fmt_m(v):
 def pct(v):  return f"{v*100:.1f}%"
 
 st.markdown("## 💰 Tax Analysis")
-st.markdown("<p style='color:#8b949e;'>Roth vs Traditional comparison, RMD projections, "
-            "Roth conversion window, IRMAA risk, and optimal withdrawal sequencing.</p>",
+st.markdown("<p style='color:#8b949e;'>Roth versus Traditional comparison, "
+            "required minimum distribution (RMD) projections, Roth conversion "
+            "window, income-related monthly adjustment amount (IRMAA) risk, "
+            "and optimal withdrawal sequencing.</p>",
             unsafe_allow_html=True)
 
 persons     = st.session_state.get("persons", [])
@@ -57,9 +59,9 @@ total_sal_now = sum(
 st.markdown("<div class='sh'>Current Tax Snapshot (Working Years)</div>",
             unsafe_allow_html=True)
 st.markdown("<div class='tip'>"
-            "Estimated federal income tax using 2026 Married Filing Jointly brackets and the "
+            "Estimated federal income tax using 2026 Married Filing Jointly (MFJ) brackets and the "
             "standard deduction ($32,200). State taxes are not modeled. This snapshot helps you "
-            "understand your current tax position, which is the baseline for Roth vs "
+            "understand your current tax position, which is the baseline for Roth versus "
             "Traditional decisions.</div>", unsafe_allow_html=True)
 
 tax_now  = calculate_federal_tax(total_sal_now)
@@ -73,9 +75,9 @@ k1.markdown(f"""<div class='card'>
     <div style='color:#8b949e;font-size:.82rem;'>Combined salaries from Household Setup</div>
 </div>""", unsafe_allow_html=True)
 k2.markdown(f"""<div class='card'>
-    <div class='kpi-label'>Est. Federal Tax</div>
+    <div class='kpi-label'>Estimated Federal Tax</div>
     <div class='kpi'>{fmt(tax_now)}</div>
-    <div style='color:#8b949e;font-size:.82rem;'>MFJ standard deduction applied</div>
+    <div style='color:#8b949e;font-size:.82rem;'>Married Filing Jointly standard deduction applied</div>
 </div>""", unsafe_allow_html=True)
 k3.markdown(f"""<div class='card'>
     <div class='kpi-label'>Marginal Rate</div>
@@ -88,7 +90,7 @@ k4.markdown(f"""<div class='card'>
     <div class='kpi-label'>Effective Rate</div>
     <div class='kpi'>{pct(eff_now)}</div>
     <div style='color:#8b949e;font-size:.82rem;'>
-        Actual % of income paid in tax.<br>
+        Actual percent of income paid in tax.<br>
         Always lower than marginal rate due to progressive brackets.</div>
 </div>""", unsafe_allow_html=True)
 
@@ -113,18 +115,18 @@ roth_contrib = rc1.number_input(
     int(tax.get("roth_contrib", 7_000)), 100,
     key="tax_roth_contrib",
     help="The dollar amount you are deciding between Roth and Traditional. "
-         "For IRAs the 2026 limit is $7,500 ($8,600 if age 50+); "
-         "for TSP/401k/403b up to $24,500 ($32,500 if 50–59/64+; $35,750 if age 60–63). "
+         "For IRAs the 2026 limit is \$7,500 (\$8,600 if age 50+); "
+         "for TSP/401k/403b up to \$24,500 (\$32,500 if 50–59/64+; \$35,750 if age 60–63). "
          "The analysis shows which approach leaves you with more after-tax wealth "
          "at retirement for this contribution amount.")
 tax["roth_contrib"] = roth_contrib
 
 exp_ret_income = rc2.number_input(
-    "Expected retirement income (today's $)", 0, 500_000,
+    "Expected retirement income (today's dollars)", 0, 500_000,
     int(tax.get("exp_ret_income",
         st.session_state.get("_guaranteed_income", {}).get("total", 80_000))), 100,
     key="tax_exp_ret_income",
-    help="Your estimated total taxable income in retirement — pension, SS, and any "
+    help="Your estimated total taxable income in retirement — pension, Social Security, and any "
          "Traditional withdrawals. Used to estimate your future marginal tax bracket. "
          "Your guaranteed income total from the Pension & Income page is pre-filled.")
 tax["exp_ret_income"] = exp_ret_income
@@ -151,7 +153,7 @@ rk1.markdown(f"""<div class='card'>
 rk2.markdown(f"""<div class='card'>
     <div class='kpi-label'>Traditional Final Value (median)</div>
     <div class='kpi'>{fmt_m(roth_result['trad_final_p50'])}</div>
-    <div style='color:#8b949e;font-size:.82rem;'>After-tax incl. tax savings invested</div>
+    <div style='color:#8b949e;font-size:.82rem;'>After-tax including tax savings invested</div>
 </div>""", unsafe_allow_html=True)
 rk3.markdown(f"""<div class='card'>
     <div class='kpi-label'>Winner</div>
@@ -242,7 +244,7 @@ low_mask = conv_df["Marginal Rate"].apply(
     lambda x: float(x.strip("%")) < float(pct(marg_now).strip("%")))
 st.dataframe(conv_df, width='stretch', hide_index=True)
 st.caption(
-    "**Base Income:** guaranteed income (pension + supplement + SS) before any conversions. "
+    "**Base Income:** guaranteed income (pension + supplement + Social Security) before any conversions. "
     "**Bracket Headroom:** how much additional income (conversions or Traditional withdrawals) "
     "you can take before jumping to the next bracket. "
     "**RMDs Started:** once RMDs begin at 73, they add forced taxable income, reducing "
@@ -318,7 +320,8 @@ st.caption(
     "**Blue line (right axis):** remaining Traditional account balance. "
     "RMDs accelerate as you age — by your mid-80s you may be withdrawing 6–8% per year "
     "regardless of market conditions. Large RMDs can push you into higher brackets and "
-    "trigger IRMAA surcharges — this is why Roth conversions before 73 are valuable.")
+    "trigger Income-Related Monthly Adjustment Amount (IRMMA) surcharges — "
+    "this is why Roth conversions before 73 are valuable.")
 
 # ── Section 5: IRMAA ──────────────────────────────────────────────────────────
 st.markdown("<div class='sh'>IRMAA Medicare Surcharge Risk</div>", unsafe_allow_html=True)
@@ -327,7 +330,7 @@ st.markdown("<div class='tip'>"
             "Part B and Part D premiums when your Modified Adjusted Gross Income exceeds "
             "thresholds. It uses a <b>2-year lookback</b> — your 2024 income determines your "
             "2026 premiums. Standard Part B premium in 2026 is $202.90/mo. "
-            "Thresholds and surcharges below are 2026 MFJ values (source: CMS/IRS)."
+            "Thresholds and surcharges below are 2026 Married Filed Jointly values (source: CMS/IRS)."
             "</div>", unsafe_allow_html=True)
 
 IRMAA_MFJ = [
@@ -355,7 +358,7 @@ for age in range(ret_age_you, min(p0.get("life_expectancy", 87) + 1, 90)):
         if magi <= thresh:
             tier = name; surcharge = sur; break
     irmaa_rows.append({
-        "Age": age, "Est. MAGI": fmt_m(magi),
+        "Age": age, "Estimated MAGI": fmt_m(magi),
         "IRMAA Tier": tier, "Surcharge": surcharge,
         "Flag": "⚠️" if tier != "Standard premium" else "✅",
     })
@@ -364,10 +367,10 @@ irmaa_df = pd.DataFrame(irmaa_rows)
 flagged  = irmaa_df[irmaa_df["Flag"] == "⚠️"]
 st.dataframe(irmaa_df, width='stretch', hide_index=True)
 st.caption(
-    "**Est. MAGI:** projected Modified AGI (pension + SS + RMDs). Does not include "
+    "**Estimated MAGI:** projected Modified Adjusted Gross Income (pension + SS + RMDs). Does not include "
     "Roth conversions or other income you may add. "
     "**Flag:** ✅ means standard Medicare premium; ⚠️ means a surcharge applies. "
-    "Remember the 2-year lookback — income in year N affects premiums in year N+2.")
+    "Remember the 2-year lookback — income in year *n* affects premiums in year *n*+2.")
 
 if not flagged.empty:
     first = int(flagged["Age"].iloc[0])
@@ -398,7 +401,7 @@ st.markdown("""
 
 **FERS-specific notes:**
 - Your pension is ordinary income from day one — plan other income sources around it.
-- In years before SS begins, your taxable income may be low enough for favorable Roth conversions.
-- The FERS Supplement is also ordinary income and counts toward IRMAA MAGI.
+- In years before Social Security begins, your taxable income may be low enough for favorable Roth conversions.
+- The FERS Supplement is also ordinary income and counts toward IRMAA Modified Adjusted Gross Income.
 - TSP Roth balances have no RMDs if rolled to a Roth IRA before age 73.
 """)

@@ -158,7 +158,6 @@ if cl != "p50":
         customdata=[fmt_m(v) for v in pcts[cl]],
     ))
 
-
 if show_spaghetti:
     paths = result["portfolio_real"] if use_real else result["portfolio_paths"]
     idx = np.random.default_rng(0).choice(result["n_sims"],
@@ -175,8 +174,10 @@ st.caption(
     "half of simulations end above this, half below. "
     "The medium band covers the 25th–75th percentile (middle 50% of outcomes). "
     "The light outer band covers the 10th–90th percentile (middle 80% of outcomes). "
-    "The dashed vertical line marks your target retirement age. "
-    "Wide bands = high uncertainty; narrow bands = more predictable trajectory.")
+    "Wide bands indicate high uncertainty; narrow bands indicate more predictable trajectory. "
+    "Dashed orange line planning confidence level selected on the Assumptions page. "
+    "The dashed vertical line marks your target retirement age."
+    )
 
 # Account breakdown chart
 st.markdown("### Account Breakdown (Median)")

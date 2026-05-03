@@ -56,7 +56,8 @@ with st.sidebar:
     st.download_button(
         "⬇️ Export profile (JSON)", export_data,
         file_name="retirement_profile.json", mime="application/json",
-        help="Saves all accounts, salaries, FERS settings, SS configuration, "
+        help="Saves all accounts, salaries, Federal Employees Retirement "
+             "System (FERS) settings, Social Security (SS) configuration, "
              "market assumptions, scenario targets, SS toggle, spend-down "
              "allocation, and tax analysis inputs.")
 
@@ -97,8 +98,10 @@ def render_person(pi: int):
     # Personal info
     st.markdown("<div class='sh'>Personal Information</div>", unsafe_allow_html=True)
     st.markdown("<div class='tip'>These fields drive age-based calculations throughout the app — "
-                "retirement horizon, FERS MRA eligibility, life expectancy for spend-down "
-                "projections, and Social Security FRA.</div>", unsafe_allow_html=True)
+                "retirement horizon, Federal Employees Retirement System "
+                "(FERS) minimum retirement age (MRA) eligibility, life "
+                "expectancy for spend-down projections, and Social Security "
+                "(SS) final retirement age (FRA).</div>", unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
     person["name"] = c1.text_input(
@@ -110,20 +113,25 @@ def render_person(pi: int):
              "accumulation horizon.")
     person["birth_year"] = c3.number_input(
         "Birth Year", 1940, 2005, person.get("birth_year", 1984), key=f"by_{pi}",
-        help="Used to determine your FERS Minimum Retirement Age (MRA), which varies "
+        help="Used to determine your FERS MRA, which varies "
              "from 55–57 depending on birth year per OPM rules.")
     person["life_expectancy"] = c4.number_input(
         "Life Expectancy", 60, 110, person["life_expectancy"], key=f"le_{pi}",
-        help="The age used as the end of your spend-down projection. SSA actuarial tables "
-             "suggest ~85–87 for men and ~87–90 for women at age 40. Consider using a "
-             "higher value (90–95) to plan conservatively.")
+        help="The age used as the end of your spend-down projection. Social "
+             "Security Administration (SSA) actuarial tables suggest ~85–87 "
+             "for men and ~87–90 for women at age 40. Consider using a higher "
+             "value (90–95) to plan conservatively.")
 
     # Salaries
     st.markdown("<div class='sh'>Salary / Income Sources</div>", unsafe_allow_html=True)
-    st.markdown("<div class='tip'>Add every source of earned income. Multiple salary rows are useful "
-                "if you hold more than one job or have distinct income streams (e.g., federal "
-                "salary + consulting). The FERS high-3 pension calculation uses the <b>sum</b> of "
-                "all salary rows for this person, projected forward with your raise assumptions."
+    st.markdown("<div class='tip'>Add every source of earned income. Multiple "
+                "salary rows are useful if you hold more than one job or have "
+                "distinct income streams (e.g., federal salary and "
+                "consulting). Select \"FERS basic pay\" for any federal "
+                "salary. The Federal Employee Retirement System (FERS) high-3 "
+                "pension calculation uses the <b>sum</b> of all FERS basic "
+                "pay salary rows for this person, projected forward with your "
+                "raise assumptions."
                 "</div>", unsafe_allow_html=True)
 
     salaries = person.setdefault("salaries", [])
@@ -133,16 +141,18 @@ def render_person(pi: int):
         sc1, sc2, sc3, sc4, sc5, sc6 = st.columns([2.5, 1.8, 1.3, 1.3, 1.3, 0.6])
         sal["label"] = sc1.text_input(
             "Label", sal["label"], key=f"sl_{pi}_{si}",
-            help="A short description of this income source, e.g. 'GS-13 Step 5' or 'Side income'.")
+            help="A short description of this income source, e.g. "
+                 "'GS-13 Step 5' or 'Side income'.")
         sal["amount"] = sc2.number_input(
             "Annual ($)", 0, 2_000_000, int(sal["amount"]), 100, key=f"sa_{pi}_{si}",
-            help="Gross annual salary before taxes. Used for contribution scaling and pension high-3.")
+            help="Gross annual salary before taxes. Used for contribution "
+                 "scaling and pension high-3, if applicable.")
         sal["raise_rate"] = sc3.number_input(
-            "Raise %", 0.0, 10.0, float(sal["raise_rate"]), 0.1, key=f"sr_{pi}_{si}",
+            "Annual Raise (%)", 0.0, 10.0, float(sal["raise_rate"]), 0.1, key=f"sr_{pi}_{si}",
             help="Expected average annual pay raise.")
         sal["raise_noise"] = sc4.number_input(
-            "Noise σ%", 0.0, 0.99, float(sal["raise_noise"]), 0.05, key=f"sn_{pi}_{si}",
-            help="Std dev of random annual raise variation (<1%).")
+            "Annual Raise Noise σ%", 0.0, 0.99, float(sal["raise_noise"]), 0.05, key=f"sn_{pi}_{si}",
+            help="Standard deviation of random annual raise variation (<1%).")
         if person.get("has_fers"):
             sal["is_fers_basic_pay"] = sc5.toggle(
                 "FERS basic pay", sal.get("is_fers_basic_pay", si == 0),
@@ -167,7 +177,7 @@ def render_person(pi: int):
     st.markdown("<div class='tip'>Add every investment and savings account. Each account can have "
                 "its own asset allocation, contribution amount, and employer match. "
                 "Account type determines tax treatment in the withdrawal sequencing and "
-                "Roth vs Traditional analysis.</div>", unsafe_allow_html=True)
+                "Roth versus Traditional analysis.</div>", unsafe_allow_html=True)
 
     accounts = person.setdefault("accounts", [])
     for acct in accounts:
@@ -199,8 +209,8 @@ def render_person(pi: int):
                 "Your Contribution ($/yr)", 0, 200_000,
                 int(acct.get("annual_contribution", 0)), 100, key=f"ac_{uid}",
                 help="The amount you personally contribute each year. For TSP, the 2026 "
-                     "limit is $24,500 ($32,500 if age 50–59 or 64+; $35,750 if age 60–63). "
-                     "For IRAs, $7,500 ($8,600 if 50+). For HSA, $4,400 individual / $8,750 family. "
+                     "limit is \$24,500 (\$32,500 if age 50–59 or 64+; \$35,750 if age 60–63). "
+                     "For IRAs, \$7,500 (\$8,600 if 50+). For HSA, \$4,400 individual / \$8,750 family. "
                      "Contributions scale proportionally as your salary grows in the simulation.")
 
             if acct["account_type"] in EMPLOYER_MATCH_TYPES:
@@ -273,7 +283,7 @@ def render_person(pi: int):
         help="Enable if this person is a federal employee covered by the Federal Employees "
              "Retirement System. Unlocks the full FERS calculator on the Pension & Income page, "
              "including high-3 projection, FERS Supplement, survivor benefit elections, and "
-             "deferred retirement modeling.")
+             "deferred retirement modeling. Disable to run analyses without considering pension.")
     if person["has_fers"]:
         st.info("⚙️ Configure FERS details on the **Pension & Income** page.")
 
@@ -281,7 +291,7 @@ def render_person(pi: int):
 st.markdown("## 👥 Household Setup")
 st.markdown("<p style='color:#8b949e;'>Enter accounts, salaries, and personal details. "
             "Use the sidebar to export your profile to JSON and reload it next session — "
-            "data is not saved automatically.</p>", unsafe_allow_html=True)
+            "data are not saved automatically.</p>", unsafe_allow_html=True)
 
 tabs = st.tabs([p["name"] for p in st.session_state.persons])
 for pi, tab in enumerate(tabs):
