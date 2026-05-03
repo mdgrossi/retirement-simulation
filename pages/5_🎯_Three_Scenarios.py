@@ -174,21 +174,25 @@ st.caption("Annual household spending in today's dollars, inflated forward autom
 
 sc1, sc2, sc3, sc4 = st.columns(4)
 scenarios["grow_spending"] = sc1.number_input(
-    "🌱 Grow ($)", 20_000, 500_000, int(scenarios.get("grow_spending", 80_000)), 100,
+    "🌱 Grow ($)", 20_000, 500_000,
+    int(st.session_state.get("scenarios", {}).get("grow_spending", 80_000)), 100,
     key="grow_sp",
     help="Portfolio grows — withdrawals < returns. Your estate increases over time.")
 scenarios["sustain_spending"] = sc2.number_input(
-    "⚖️ Sustain ($)", 20_000, 500_000, int(scenarios.get("sustain_spending", 105_000)), 100,
+    "⚖️ Sustain ($)", 20_000, 500_000,
+    int(st.session_state.get("scenarios", {}).get("sustain_spending", 105_000)), 100,
     key="sus_sp",
     help="Portfolio flat — withdrawals ≈ returns after inflation. Equivalent to the 4% rule "
          "portfolio at 4% real return.")
 scenarios["deplete_spending"] = sc3.number_input(
-    "📉 Deplete ($)", 20_000, 500_000, int(scenarios.get("deplete_spending", 130_000)), 100,
+    "📉 Deplete ($)", 20_000, 500_000,
+    int(st.session_state.get("scenarios", {}).get("deplete_spending", 130_000)), 100,
     key="dep_sp",
     help="Portfolio depletes toward reserve floor by life expectancy. Maximum sustainable "
          "spending without running out.")
 scenarios["reserve_amount"] = sc4.number_input(
-    "🔒 Reserve ($)", 0, 500_000, int(scenarios.get("reserve_amount", 75_000)), 100,
+    "🔒 Reserve ($)", 0, 500_000,
+    int(st.session_state.get("scenarios", {}).get("reserve_amount", 75_000)), 100,
     key="res_amt",
     help="Minimum balance to maintain even in the Deplete scenario. A safety buffer against "
          "living longer than expected or unexpected expenses. Success = never breaching this floor.")
@@ -207,16 +211,20 @@ if cur_proj > 0:
         st.caption(f"Based on your {cl_label} projected portfolio of {fmt_m(cur_proj)} at retirement, "
                    f"a real return of {real_ret*100:.1f}%, and a {yrs_dist}-year horizon.")
         ac1, ac2, ac3 = st.columns(3)
-        ac1.metric("🌱 Grow", fmt(suggested["grow_spending"]) + "/yr",
+        ac1.metric("🌱 Grow",    fmt(suggested["grow_spending"])    + "/yr",
                     help="Portfolio grows 1%/yr in real terms")
         ac2.metric("⚖️ Sustain", fmt(suggested["sustain_spending"]) + "/yr",
                     help="Balance stays flat in real terms — perpetuity formula")
         ac3.metric("📉 Deplete", fmt(suggested["deplete_spending"]) + "/yr",
-                    help="Principal Value annuity that exhausts portfolio to reserve by life expectancy")
+                    help="PV annuity that exhausts portfolio to reserve by life expectancy")
         if st.button("↩ Apply these targets to the inputs above"):
-            scenarios["grow_spending"]    = int(suggested["grow_spending"])
-            scenarios["sustain_spending"] = int(suggested["sustain_spending"])
-            scenarios["deplete_spending"] = int(suggested["deplete_spending"])
+            # Write to session_state so Streamlit resets widget values on rerun
+            st.session_state["scenarios"]["grow_spending"]    = int(suggested["grow_spending"])
+            st.session_state["scenarios"]["sustain_spending"] = int(suggested["sustain_spending"])
+            st.session_state["scenarios"]["deplete_spending"] = int(suggested["deplete_spending"])
+            # Also clear widget keys so number_inputs re-render with new defaults
+            for k in ("grow_sp", "sus_sp", "dep_sp"):
+                st.session_state.pop(k, None)
             st.rerun()
 else:
     st.caption("Run **Accumulation** first to enable auto-calculate spending targets.")
@@ -365,12 +373,13 @@ st.markdown("<div class='sh'>Portfolio Trajectories</div>", unsafe_allow_html=Tr
 fig_overlay = multi_scenario_fan(results, use_real=use_real)
 st.plotly_chart(fig_overlay, width='stretch')
 st.caption(
-    "All three scenarios plotted from the same starting portfolio. "
-    "Shaded bands cover the 25th–75th percentile of Monte Carlo simulations; "
-    "solid lines are medians. Where scenarios overlap, market uncertainty dominates "
-    "spending differences — the choice of spending level matters less than it appears.")
+    "**This overlay chart** shows all three scenarios on the same axes for direct comparison. "
+    "Each colored band is one scenario's P25–P75 range; solid lines are medians. "
+    "Use it to see how much the choice of spending level affects your outcome.")
 
 if mc_type == "Fan Chart (percentile bands)":
+    st.markdown("**Individual scenario charts** — same data as above, shown separately "
+                "so you can read each scenario's full percentile range and reserve floor clearly.")
     cols = st.columns(3)
     for i, (key, (label, color, _)) in enumerate(labels.items()):
         res  = results[key]
@@ -532,16 +541,24 @@ meaning in {prob_fixed:.0f}% of simulations, your portfolio never falls below th
     for mode, lbl, clr, _ in scenario_goals:
         req_line = estimate_needed_portfolio(fixed_gap, yrs_dist, real_ret, mode,
                                               reserve=scenarios["reserve_amount"])
-        fig_fs.add_hline(
-            y=req_line, line_dash="dash", line_color=clr, line_width=1.5,
-            annotation_text=f"{lbl}: {fmt_m(req_line)}",
-            annotation_font_color=clr, annotation_position="right")
+        fig_fs.add_trace(go.Scatter(
+            x=[ages_fixed[0], ages_fixed[-1]],
+            y=[req_line, req_line],
+            mode="lines",
+            name=f"{lbl}: {hfmt_m(req_line)} needed",
+            line=dict(color=clr, width=1.5, dash="dash"),
+            showlegend=True,
+        ))
 
-    fig_fs.add_hline(
-        y=scenarios["reserve_amount"],
-        line_dash="dot", line_color="#f85149", line_width=1,
-        annotation_text="Reserve floor", annotation_font_color="#f85149",
-        annotation_position="right")
+    # Reserve floor — single Scatter trace avoids Plotly annotation duplication
+    fig_fs.add_trace(go.Scatter(
+        x=[ages_fixed[0], ages_fixed[-1]],
+        y=[scenarios["reserve_amount"], scenarios["reserve_amount"]],
+        mode="lines",
+        name=f"Reserve floor: {hfmt_m(scenarios['reserve_amount'])}",
+        line=dict(color="#f85149", width=1.5, dash="dot"),
+        showlegend=True,
+    ))
 
     st.plotly_chart(fig_fs, width='stretch')
     st.caption(
